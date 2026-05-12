@@ -136,8 +136,8 @@
                 <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: 4f23cfb</span>
             </div>
         </div>
-        <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
-        <textarea id="paste-area" placeholder="Paste spreadsheet data here (or drop a CSV file)..."></textarea>
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste a spreadsheet or drop a PAE.</div>
+        <textarea id="paste-area" placeholder="Paste spreadsheet data or drop a PAE..."></textarea>
         <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
             <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Scan PDF</button>
             <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
@@ -360,8 +360,8 @@
                 <div class="client-info">
                     <strong>Investigator:</strong> <span id="field-investigator" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
                     <strong>Invoice #:</strong> <span id="field-invoice-num" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
-                    <strong>Invoice Date:</strong> <span id="field-invoice-date" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                    <strong>Date Range:</strong> <span id="field-date-range" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                    <strong>Invoice Date:</strong> <span id="field-invoice-date" class="placeholder-bg" contenteditable="true">click to enter</span><br>
+                    <strong>Date Range:</strong> <span id="field-date-range" class="placeholder-bg" contenteditable="true">click to enter</span>
                 </div>
             </div>
         </div>
