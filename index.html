@@ -14,69 +14,69 @@
     <title>Invoice Creator</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
-        body { background: #f0f2f5; padding: 20px; color: #333; }
+        body { background: #1a1a1a; padding: 20px; color: #e0e0e0; }
         
         /* App Controls */
-        #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: #fff; padding: 20px; border-radius: 8px; border: 2px dashed #0066cc; }
+        #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: #2d2d2d; padding: 20px; border-radius: 8px; border: 2px dashed #0066cc; }
         #import-zone h3 { margin-bottom: 2px; font-size: 16px; color: #0066cc; }
-        #paste-area { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-size: 13px; }
-        .instructions { font-size: 11px; color: #666; margin-top: 5px; }
-        #ai-results { margin-top: 15px; padding: 12px; background: #fdfdfe; border-left: 4px solid #0066cc; border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: #444; }
+        #active-model-display { font-size: 12px; color: #88aaff; font-weight: bold; margin-right: 8px; }
+        #paste-area { width: 100%; height: 80px; padding: 10px; border: 1px solid #555; border-radius: 4px; resize: vertical; font-size: 13px; background: #1e1e1e; color: #e0e0e0; }
+        .instructions { font-size: 11px; color: #aaa; margin-top: 5px; }
+        #ai-results { margin-top: 15px; padding: 12px; background: #252525; border-left: 4px solid #0066cc; border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: #e0e0e0; }
         .ai-loading { color: #0066cc; font-style: italic; }
         /* Settings Modal Styles */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 600px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 15px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: #2d2d2d; padding: 30px; border-radius: 8px; width: 600px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: #e0e0e0; }
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #0066cc; display: flex; justify-content: space-between; align-items: center; }
-        .modal-tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
-        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: bold; color: #666; transition: all 0.2s; }
+        .modal-tabs { display: flex; border-bottom: 1px solid #555; margin-bottom: 15px; }
+        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: bold; color: #aaa; transition: all 0.2s; }
         .modal-tab:hover { color: #0066cc; }
         .modal-tab.active { color: #0066cc; border-bottom-color: #0066cc; }
         .tab-content { display: none; min-height: 120px; }
         .tab-content.active { display: block; }
         .settings-field { margin-bottom: 20px; }
-        .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: #333; font-weight: bold; }
+        .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: #e0e0e0; font-weight: bold; }
         .input-group { display: flex; gap: 5px; }
-        .settings-field input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
-        .settings-field input:read-only { background: #f5f5f5; color: #777; cursor: not-allowed; }
-        .settings-field select { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
-        .settings-field textarea { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; resize: vertical; }
-        .btn-icon { background: #f8f9fa; border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; }
+        .settings-field input { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #1e1e1e; color: #e0e0e0; }
+        .settings-field input:read-only { background: #252525; color: #aaa; cursor: not-allowed; }
+        .settings-field select { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #1e1e1e; color: #e0e0e0; }
+        .settings-field textarea { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #1e1e1e; color: #e0e0e0; resize: vertical; }
+        .btn-icon { background: #3d3d3d; border: 1px solid #555; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; color: #e0e0e0; }
         .btn-test { background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
         .btn-test:hover { background: #0052a3; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #999; }
-        .btn-close:hover { color: #333; }
+        .btn-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
+        .btn-close:hover { color: #fff; }
 
-        .invoice-container { max-width: 950px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        @media print { #import-zone, #ai-results, .modal-overlay { display: none !important; } body { padding: 0; background: none; } .invoice-container { box-shadow: none; padding: 0; } }
+        .invoice-container { max-width: 950px; margin: 0 auto; background: #1e1e1e; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: #e0e0e0; }
+        @media print { #import-zone, #ai-results, .modal-overlay { display: none !important; } body { padding: 0; background: white; } .invoice-container { box-shadow: none; padding: 0; background: white; color: black; } }
 
-        .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #333; gap: 20px; }
-        .vendor-info { margin-left: auto; margin-right: 80px; }
+        .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #555; gap: 20px; }
+        .vendor-info { margin-left: auto; margin-right: 80px; text-align: left; font-size: 12px; color: #ccc; white-space: nowrap; }
         .header img { height: 80px; width: 80px; flex-shrink: 0; }
         [contenteditable="true"] { cursor: text; padding: 2px 4px; border-radius: 3px; transition: background 0.2s; }
-        .placeholder-bg { background-color: #eef7ff !important; }
-        [contenteditable="true"]:hover { background: #f0f7ff; outline: 1px dashed #0066cc; }
-        .company-info h1 { font-size: 24px; margin-bottom: 5px; color: #333; }
-        .company-details { font-size: 12px; color: #666; line-height: 1.5; }
-        .vendor-info { text-align: left; font-size: 12px; color: #666; white-space: nowrap; }
+        .placeholder-bg { background-color: #333 !important; color: #777 !important; }
+        [contenteditable="true"]:hover { background: #333; outline: 1px dashed #0066cc; color: #e0e0e0; }
+        .company-info h1 { font-size: 24px; margin-bottom: 5px; color: #e0e0e0; }
+        .company-details { font-size: 12px; color: #aaa; line-height: 1.5; }
         .top-section { display: flex; gap: 40px; margin-bottom: 5px; }
         .client-section, .invoice-details { flex: 1; }
-        .section-title { font-size: 12px; font-weight: bold; color: #666; text-transform: uppercase; margin-bottom: 8px; }
-        .client-info { font-size: 12px; color: #333; line-height: 1.6; }
+        .section-title { font-size: 12px; font-weight: bold; color: #aaa; text-transform: uppercase; margin-bottom: 8px; }
+        .client-info { font-size: 12px; color: #e0e0e0; line-height: 1.6; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; }
-        .section-heading { font-size: 13px; font-weight: bold; background: #f0f0f0; padding: 8px; margin-top: 5px; margin-bottom: 0; }
-        table thead { background: #e8e8e8; }
-        table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid #999; color: #333; }
-        table td { padding: 6px; border-bottom: 1px solid #ddd; white-space: nowrap; }
-        table tr.case-header td { background: #f9f9f9; font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid #bbb; }
-        table tr.subtotal td { background: #f0f0f0; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; padding-top: 6px; padding-bottom: 6px; }
-        table tr.grand-total td { background: #f0f0f0; color: #333; font-weight: bold; border-top: 2px solid #333; padding: 8px 6px; }
+        .section-heading { font-size: 13px; font-weight: bold; background: #333; padding: 8px; margin-top: 5px; margin-bottom: 0; color: #e0e0e0; }
+        table thead { background: #252525; }
+        table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid #555; color: #e0e0e0; }
+        table td { padding: 6px; border-bottom: 1px solid #444; white-space: nowrap; color: #ccc; }
+        table tr.case-header td { background: #2a2a2a; font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid #555; color: #e0e0e0; }
+        table tr.subtotal td { background: #252525; font-weight: bold; border-top: 2px solid #555; border-bottom: 2px solid #555; padding-top: 6px; padding-bottom: 6px; color: #e0e0e0; }
+        table tr.grand-total td { background: #252525; color: #fff; font-weight: bold; border-top: 2px solid #666; padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
-        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid #333; }
+        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid #666; }
         .blue-text { color: #0066cc; }
-        .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #333; }
+        .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #555; }
         .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 12px; }
-        .total-item { display: flex; justify-content: space-between; padding: 8px; background: #f9f9f9; border: 1px solid #ddd; }
+        .total-item { display: flex; justify-content: space-between; padding: 8px; background: #252525; border: 1px solid #444; color: #e0e0e0; }
         #import-zone textarea + div button {
             width: 100% !important;
             min-width: 0 !important;
@@ -97,7 +97,7 @@
                 <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
             </div>
         </div>
-        <div style="font-size: 11px; color: #666; margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
+        <div style="font-size: 11px; color: #aaa; margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
         <textarea id="paste-area" placeholder="Paste spreadsheet data here (or drop a CSV file)..."></textarea>
         <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
             <button onclick="document.getElementById('pdf-input').click()" style="padding: 6px 8px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Scan PDF for PAE Info</button>
@@ -604,13 +604,13 @@
                 if (totalHoursBilled > authHours) {
                     const overage = (totalHoursBilled - authHours).toFixed(1);
                     totalRows[5].cells[0].textContent = `⚠️ +${overage} hrs over auth`;
-                    totalRows[5].cells[0].style.cssText = 'background: #fff3cd; color: #856404; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #ffeeba; border-bottom: 2px solid #ffeeba;';
-                    totalRows[5].cells[1].style.cssText = 'background: #fff3cd; border-top: 2px solid #ffeeba; border-bottom: 2px solid #ffeeba; border-left: none; border-right: none;';
+                    totalRows[5].cells[0].style.cssText = 'background: #522; color: #ffcccc; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #f66; border-bottom: 2px solid #f66;';
+                    totalRows[5].cells[1].style.cssText = 'background: #522; border-top: 2px solid #f66; border-bottom: 2px solid #f66; border-left: none; border-right: none; color: #ffcccc;';
                 } else {
                     const remaining = (authHours - totalHoursBilled).toFixed(1);
                     totalRows[5].cells[0].textContent = `✓ ${remaining} hrs remaining`;
-                    totalRows[5].cells[0].style.cssText = 'background: #d4edda; color: #155724; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #333; border-bottom: 2px solid #333;';
-                    totalRows[5].cells[1].style.cssText = 'background: #d4edda; border-top: 2px solid #333; border-bottom: 2px solid #333; border-left: none; border-right: none;';
+                    totalRows[5].cells[0].style.cssText = 'background: #252525; color: #6f6; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #666; border-bottom: 2px solid #666;';
+                    totalRows[5].cells[1].style.cssText = 'background: #252525; border-top: 2px solid #666; border-bottom: 2px solid #666; border-left: none; border-right: none; color: #6f6;';
                 }
             } else {
                 totalRows[5].cells[0].textContent = '';
