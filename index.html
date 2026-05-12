@@ -1839,12 +1839,13 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             const invoiceEl = document.querySelector('.invoice-container');
             if (!invoiceEl) return;
 
-            // Build filename from case # and client name (skip placeholders)
-            const caseEl = document.getElementById('field-case');
-            const clientEl = document.getElementById('field-client');
-            const caseVal = getFieldValue(caseEl).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const clientVal = getFieldValue(clientEl).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const filename = caseVal && clientVal ? `Invoice_${caseVal}_${clientVal}.pdf` : (caseVal ? `Invoice_${caseVal}.pdf` : 'Invoice.pdf');
+            // Build filename: Vendor {vendor_num} PAE {pae_num}.pdf
+            const vendorInfo = document.querySelector('.vendor-info');
+            const vendorMatch = vendorInfo ? vendorInfo.textContent.match(/Vendor\s*#:\s*([\d-]+)/) : null;
+            const vendorNum = vendorMatch ? vendorMatch[1].replace(/-/g, ' ') : 'vendor';
+            const paeEl = document.getElementById('field-pae');
+            const paeVal = getFieldValue(paeEl);
+            const filename = paeVal ? `Vendor ${vendorNum} PAE ${paeVal}.pdf` : `Vendor ${vendorNum}.pdf`;
 
             // Clone invoice and apply print-friendly styles to the clone only
             const clone = invoiceEl.cloneNode(true);
