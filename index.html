@@ -501,12 +501,12 @@
                     const hoursCell = currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0';
                     const hours = parseFloat(hoursCell) || 0;
 
-                    if (dateCell && hours > 0) {
+                    if (dateCell) {
                         const date = new Date(dateCell);
                         if (!isNaN(date.getTime())) allServiceDates.push(date);
-                        const isEarly = date < CONFIG.RATE_CUTOFF_DATE;
-                        if (isEarly) caseHours55 += hours;
-                        else caseHours59 += hours;
+                        const year = date.getFullYear();
+                        if (year === 2025) caseHours55 += hours;
+                        else if (year === 2026) caseHours59 += hours;
                     }
                     currentRow = currentRow.nextElementSibling;
                 }
@@ -523,7 +523,7 @@
                 }
             });
 
-            // Update Date Range automatically from ALL service entries
+            // Update Date Range automatically from ALL service entries (even zero-hour entries)
             if (allServiceDates.length > 0) {
                 const minDate = new Date(Math.min(...allServiceDates));
                 const maxDate = new Date(Math.max(...allServiceDates));
