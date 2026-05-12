@@ -38,7 +38,8 @@
         .ai-loading { color: var(--border); font-style: italic; }
         /* Settings Modal Styles */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: var(--surface); padding: 30px; border-radius: 8px; width: 800px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: var(--text); }
+        .modal-content { background: var(--surface); padding: 30px; border-radius: 8px; width: 900px; max-width: 95vw; min-width: 600px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: var(--text); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); resize: both; overflow: auto; }
+        .modal-header { cursor: move; user-select: none; }
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: var(--border); display: flex; justify-content: space-between; align-items: center; }
         .modal-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 15px; }
         .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: var(--muted); transition: all 0.2s; }
@@ -1628,6 +1629,72 @@
                     updateInvoiceTotals();
                 }
             }, true); // Use capture phase for blur as it doesn't bubble
+
+            // Make Settings modal draggable and resizable
+            const modal = document.getElementById('settings-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            const header = modal.querySelector('.modal-header');
+            let isDragging = false, isResizing = false;
+            let offsetX, offsetY, startX, startY, startWidth, startHeight;
+
+            header.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = modalContent.getBoundingClientRect();
+                offsetX = startX - rect.left;
+                offsetY = startY - rect.top;
+                header.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const newX = e.clientX - offsetX;
+                    const newY = e.clientY - offsetY;
+                    modalContent.style.left = newX + 'px';
+                    modalContent.style.top = newY + 'px';
+                    modalContent.style.transform = 'none';
+                    modalContent.style.right = 'auto';
+                    modalContent.style.bottom = 'auto';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    header.style.cursor = 'grab';
+                }
+            });
+
+            // Resize handle: add a div at bottom-right corner
+            const resizeHandle = document.createElement('div');
+            resizeHandle.style.cssText = 'position: absolute; bottom: 0; right: 0; width: 15px; height: 15px; cursor: se-resize; background: linear-gradient(135deg, transparent 50%, var(--border) 50%); border-bottom-right-radius: 8px;';
+            modalContent.appendChild(resizeHandle);
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = modalContent.offsetWidth;
+                startHeight = modalContent.offsetHeight;
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isResizing) {
+                    const width = startWidth + (e.clientX - startX);
+                    const height = startHeight + (e.clientY - startY);
+                    modalContent.style.width = Math.max(600, width) + 'px';
+                    modalContent.style.height = Math.max(400, height) + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+            });
+
+            // Initial drag handle cursor on header
+            header.style.cursor = 'grab';
         });
     </script>
 </body>
