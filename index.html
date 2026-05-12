@@ -1570,14 +1570,29 @@ If no issues: "No validation issues detected."`;
             function updatePreview() {
                 const previewEl = modal.querySelector('#preview-list');
                 if (!previewEl) return;
+                
+                // Compute effective numbers (auto-increment for entries without custom number)
+                const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
+                const effectiveAssignments = assignments.map(item => {
+                    if (item.label === 'skip') {
+                        return { ...item, effectiveNum: null };
+                    }
+                    if (item.customNum && item.customNum > 0) {
+                        return { ...item, effectiveNum: item.customNum };
+                    } else {
+                        counters[item.label] += 1;
+                        return { ...item, effectiveNum: counters[item.label] };
+                    }
+                });
+
                 let html = '';
-                assignments.forEach(({ name, label, customNum }) => {
+                effectiveAssignments.forEach(({ name, label, effectiveNum }) => {
                     if (label === 'skip') {
                         html += `<div>${name} → <span style="color:var(--muted)">(skipped)</span></div>`;
                         return;
                     }
-                    const num = (customNum && customNum > 0) ? customNum : 'auto';
-                    html += `<div>${name} → <strong>${label.charAt(0).toUpperCase() + label.slice(1)} ${num}</strong></div>`;
+                    const displayNum = effectiveNum !== null ? effectiveNum : 'auto';
+                    html += `<div>${name} → <strong>${label.charAt(0).toUpperCase() + label.slice(1)} ${displayNum}</strong></div>`;
                 });
                 previewEl.innerHTML = html;
             }
