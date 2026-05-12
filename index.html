@@ -2004,6 +2004,18 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             // This prevents a blank "auto-save" from overwriting your data
             updateInvoiceTotals();
 
+            // Auto-populate version label from GitHub API (latest commit on main)
+            fetch('https://api.github.com/repos/tlee612-lab/Invoice-Creator/commits/main')
+                .then(r => r.json())
+                .then(data => {
+                    const sha = data.sha?.substring(0, 8);
+                    if (sha) {
+                        const el = document.getElementById('git-version');
+                        if (el) el.textContent = 'ver: ' + sha;
+                    }
+                })
+                .catch(err => console.warn('Could not fetch commit SHA:', err));
+
             const pasteArea = document.getElementById('paste-area');
             
             // Use the specific paste event which is more reliable for large spreadsheet data
