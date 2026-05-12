@@ -415,7 +415,7 @@
             return { caseHeader, subtotalRow };
         }
 
-function updateInvoiceTotals() {
+        function updateInvoiceTotals() {
             let totalHours55 = 0, totalHours59 = 0;
             let totalMiles2025 = 0, totalMiles2026 = 0;
             let totalExpenses = 0;
@@ -429,7 +429,7 @@ function updateInvoiceTotals() {
                 let caseHours55 = 0, caseHours59 = 0;
                 let currentRow = caseHeader.nextElementSibling;
                 while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
-                    const dateCell = currentRow.cells[0].textContent.trim();
+                    const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
                     const hoursCell = currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0';
                     const hours = parseFloat(hoursCell) || 0;
 
@@ -472,7 +472,7 @@ function updateInvoiceTotals() {
                 let caseMiles2025 = 0, caseMiles2026 = 0;
                 let currentRow = caseHeader.nextElementSibling;
                 while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
-                    const dateCell = currentRow.cells[0].textContent.trim();
+                    const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
                     const milesCell = currentRow.cells[2] ? currentRow.cells[2].textContent.trim() : '0';
                     const miles = parseFloat(milesCell) || 0;
 
@@ -559,8 +559,10 @@ function updateInvoiceTotals() {
             });
 
             // Update totals table
-            const totalsTable = document.querySelector('.invoice-totals-table');
-            const totalRows = totalsTable.querySelectorAll('tbody tr');
+            const totalsTable = document.querySelector('.invoice-totals-table tbody');
+            if (!totalsTable) return;
+            const totalRows = totalsTable.querySelectorAll('tr');
+            if (totalRows.length < 6) return; // Safety: totals table malformed
 
             totalRows[0].cells[0].textContent = `B&W Copies: ${totalBW} ($${(totalBW * CONFIG.COPY_RATE_BW).toFixed(2)})`;
             totalRows[1].cells[0].textContent = `Color Copies: ${totalColor} ($${(totalColor * CONFIG.COPY_RATE_COLOR).toFixed(2)})`;
@@ -1465,8 +1467,8 @@ function updateInvoiceTotals() {
                     if (el) el.textContent = '';
                 });
 
-                // Clear all invoice table rows to start fresh
-                document.querySelectorAll('table tbody').forEach(tbody => tbody.innerHTML = '');
+                // Clear only line item tables (totals table will be recalculated)
+                document.querySelectorAll('#table-hours tbody, #table-mileage tbody, #table-expenses tbody').forEach(tbody => tbody.innerHTML = '');
 
                 // Show a loading indicator here if desired
                 const arrayBuffer = await file.arrayBuffer();
@@ -1478,8 +1480,10 @@ function updateInvoiceTotals() {
                     const textContent = await page.getTextContent();
                     fullText += textContent.items.map(item => item.str).join(" ") + " ";
                 }
-                if (extractHeaderInfo(fullText)) {
-                    updateInvoiceTotals();
+                const extracted = extractHeaderInfo(fullText);
+                // Always recalc totals after clearing tables, even if no header fields were extracted
+                updateInvoiceTotals();
+                if (extracted) {
                     saveInvoiceData();
                 }
             } catch (error) { console.error('PDF Scan Error:', error); }
