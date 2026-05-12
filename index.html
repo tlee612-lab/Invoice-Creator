@@ -1371,9 +1371,11 @@
 
             // Build and show modal
             const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;padding:20px';
             const modal = document.createElement('div');
-            modal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow:auto';
+            modal.className = 'modal-content';
+            modal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow:auto';
 
             let html = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1381,13 +1383,14 @@
                     <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
                 </div>
                 <div style="margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.5">
-                    For each name found, assign a label. The name will be replaced with that label in all cases.<br>
+                    For each name found, assign a label and number. The name will be replaced with that label in all cases.<br>
                     <strong>Note:</strong> Client and Investigator header fields are never changed.
                 </div>
-                <div style="display:grid;grid-template-columns:1.5fr 1fr 120px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+                <div style="display:grid;grid-template-columns:1.5fr 1fr 130px 80px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
                     <div>Name</div>
                     <div>Case(s)</div>
                     <div style="text-align:center">Label</div>
+                    <div style="text-align:center">Number</div>
                 </div>
                 <div id="name-assignments-list"></div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
@@ -1402,35 +1405,44 @@
             assignments.forEach((item, idx) => {
                 const caseStr = item.cases.join(', ');
                 const row = document.createElement('div');
-                row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 120px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px';
+                row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
                 row.innerHTML = `
                     <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.name}">${item.name}</div>
                     <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${caseStr}">${caseStr}</div>
-                    <select data-idx="${idx}" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center">
+                    <select data-idx="${idx}" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center">
                         <option value="skip">— Skip —</option>
                         <option value="witness">Witness</option>
                         <option value="poi">POI</option>
                         <option value="client">Client</option>
                         <option value="victim">Victim</option>
                     </select>
+                    <input type="number" min="1" data-idx="${idx}" placeholder="auto" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%">
                 `;
                 listEl.appendChild(row);
             });
 
             document.getElementById('applyNameLabels').onclick = () => {
-                // Read selections
+                // Read selections and numbers
                 assignments.forEach((item, idx) => {
                     const sel = modal.querySelector(`select[data-idx="${idx}"]`);
+                    const numInput = modal.querySelector(`input[data-idx="${idx}"]`);
                     item.label = sel.value;
+                    item.customNum = numInput ? parseInt(numInput.value) : null;
                 });
                 overlay.remove();
 
-                // Apply replacements with sequential numbering per category
+                // Apply replacements
                 const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
-                assignments.forEach(({ name, label }) => {
+                assignments.forEach(({ name, label, customNum }) => {
                     if (label === 'skip') return;
-                    counters[label] += 1;
-                    const replacement = `${label.charAt(0).toUpperCase() + label.slice(1)} ${counters[label]}`;
+                    let finalNum;
+                    if (customNum && customNum > 0) {
+                        finalNum = customNum;
+                    } else {
+                        counters[label] += 1;
+                        finalNum = counters[label];
+                    }
+                    const replacement = `${label.charAt(0).toUpperCase() + label.slice(1)} ${finalNum}`;
                     rows.forEach(({ element }) => {
                         element.textContent = element.textContent.replace(name, replacement);
                     });
