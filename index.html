@@ -144,7 +144,7 @@
             <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
             <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
             <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
-            <button id="btn-ai" onclick="openAiMenu()" title="AI tools" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
+            <button onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Convert Names</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="display:none">
             <input type="file" id="json-input" accept=".json" style="display:none">
@@ -1229,135 +1229,11 @@
             if (savedData) applyInvoiceState(JSON.parse(savedData));
         }
 
-        // Name anonymization — maps real names to short codes
-        let NAME_CODES = JSON.parse(localStorage.getItem('invoiceNameCodes')) || {};
-
-        function getCode(name, type) {
-            if (!name) return '';
-            const key = `${type}_${name}`;
-            if (!NAME_CODES[key]) {
-                const prefix = type === 'client' ? 'C' : 'I';
-                const num = Object.keys(NAME_CODES).filter(k => k.startsWith(prefix)).length + 1;
-                NAME_CODES[key] = `${prefix}${String(num).padStart(3, '0')}`;
-                saveNameCodes();
-            }
-            return NAME_CODES[key];
+        function convertNamesToCodes() {
+            alert("Convert Names feature not yet implemented.");
         }
 
-        function saveNameCodes() {
-            localStorage.setItem('invoiceNameCodes', JSON.stringify(NAME_CODES));
-        }
-
-        function renderNameCodesList() {
-            const container = document.getElementById('name-codes-list');
-            if (!container) return;
-            container.innerHTML = '';
-            Object.entries(NAME_CODES).forEach(([key, code]) => {
-                const [type, name] = key.split('_').rest ? [key.split('_')[0], key.split('_').slice(1).join('_')] : [key.split('_')[0], key.split('_')[1]];
-                const row = document.createElement('div');
-                row.style.cssText = 'display: flex; gap: 8px; padding: 6px; border-bottom: 1px solid #eee; align-items: center;';
-                row.innerHTML = `
-                    <span style="flex: 1; font-weight: bold; color: #333;">${code}</span>
-                    <span style="flex: 2; color: #666; font-size: 12px;">${name}</span>
-                    <button onclick="removeNameCode('${key}')" style="padding: 2px 6px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 3px;">✕</button>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function addNameCodeRow() {
-            const name = prompt("Enter name to anonymize:");
-            if (!name) return;
-            const type = confirm("Is this a Client? (OK = Yes, Cancel = Investigator)") ? 'client' : 'investigator';
-            const existingKey = `${type}_${name}`;
-            if (NAME_CODES[existingKey]) {
-                alert("This name already has code: " + NAME_CODES[existingKey]);
-                return;
-            }
-            getCode(name, type); // auto-generates
-            renderNameCodesList();
-        }
-
-        function removeNameCode(key) {
-            delete NAME_CODES[key];
-            saveNameCodes();
-            renderNameCodesList();
-        }
-
-        async function convertNamesToCodes() {
-            // Collect all unique name candidates
-            const candidates = new Set();
-
-            // 1. Check header fields
-            const clientEl = document.getElementById('field-client');
-            const investEl = document.getElementById('field-investigator');
-            
-            const clientText = (clientEl ? clientEl.textContent.trim() : '');
-            const investText = (investEl ? investEl.textContent.trim() : '');
-            
-            if (clientText && !clientText.includes('enter') && !clientText.includes('Drop')) {
-                candidates.add({ text: clientText, field: clientEl, type: 'client' });
-            }
-            if (investText && !investText.includes('enter') && !investText.includes('Drop')) {
-                candidates.add({ text: investText, field: investEl, type: 'investigator' });
-            }
-
-            // 2. Scan Service Hours table descriptions for names (heuristic: consecutive capitalized words)
-            const hoursTable = document.getElementById('table-hours');
-            if (hoursTable) {
-                hoursTable.querySelectorAll('tbody td:nth-child(3)').forEach(td => {
-                    const desc = td.textContent.trim();
-                    // If description contains capitalized words (potential names), extract
-                    // Simple heuristic: sequences like "John Smith" (2-3 capitalized words)
-                    const nameMatches = desc.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/g);
-                    if (nameMatches) {
-                        nameMatches.forEach(name => {
-                            if (name.length > 3 && !NAME_CODES[`client_${name}`] && !NAME_CODES[`investigator_${name}`]) {
-                                candidates.add({ text: name, descCell: td, type: null });
-                            }
-                        });
-                    }
-                });
-            }
-
-            if (candidates.size === 0) {
-                alert("No names found to convert.");
-                return;
-            }
-
-            // Process each candidate
-            const results = [];
-            for (const item of candidates) {
-                let type = item.type;
-                if (!type) {
-                    // Ask user: Is this a Client or Investigator?
-                    const isClient = confirm(`Classify "${item.text}" as:\nOK = Client\nCancel = Investigator`);
-                    type = isClient ? 'client' : 'investigator';
-                }
-                const code = getCode(item.text, type);
-                // Replace in DOM
-                if (item.field) {
-                    item.field.textContent = code;
-                    item.field.classList.remove('placeholder-bg');
-                } else if (item.descCell) {
-                    item.descCell.textContent = item.descCell.textContent.replace(item.text, code);
-                }
-                results.push(`${type}: "${item.text}" → ${code}`);
-            }
-
-            saveNameCodes();
-            saveInvoiceData();
-            alert("Conversion complete:\n" + results.join('\n'));
-        }
-
-        // Call on Settings open and on page load to populate list
-        function initNameCodesTab() {
-            renderNameCodesList();
-        }
-
-        // Update handleDataImport to apply name codes for TLI format
-        // Inside the TLI block, replace investigator name and client name with codes
-        let confirmResolve = null;
+        // Confirm modal functions
         function showConfirmModal(message) {
             return new Promise((resolve) => {
                 confirmResolve = resolve;
