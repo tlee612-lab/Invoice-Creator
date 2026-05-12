@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+    "name": "Invoice Preview",
+    "schemaVersion": 1,
+    "description": "Live invoice preview"
+}
+</script>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <title>Invoice</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; color: #333; }
+        
+        /* App Controls */
+        #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: #fff; padding: 20px; border-radius: 8px; border: 2px dashed #0066cc; }
+        #import-zone h3 { margin-bottom: 2px; font-size: 16px; color: #0066cc; }
+        #paste-area { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-size: 13px; }
+        .instructions { font-size: 11px; color: #666; margin-top: 5px; }
+        #ai-results { margin-top: 15px; padding: 12px; background: #fdfdfe; border-left: 4px solid #0066cc; border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: #444; }
+        .ai-loading { color: #0066cc; font-style: italic; }
+        /* Settings Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #0066cc; display: flex; justify-content: space-between; align-items: center; }
+        .modal-tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+        .modal-tab { padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; font-weight: bold; color: #666; transition: all 0.2s; }
+        .modal-tab:hover { color: #0066cc; }
+        .modal-tab.active { color: #0066cc; border-bottom-color: #0066cc; }
+        .tab-content { display: none; min-height: 120px; }
+        .tab-content.active { display: block; }
+        .settings-field { margin-bottom: 15px; }
+        .settings-field label { display: block; font-size: 12px; margin-bottom: 5px; color: #666; font-weight: bold; }
+        .input-group { display: flex; gap: 5px; }
+        .settings-field input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #fff; }
+        .settings-field input:read-only { background: #f5f5f5; color: #777; cursor: not-allowed; }
+        .btn-icon { background: #f8f9fa; border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; }
+        .btn-test { background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-test:hover { background: #0052a3; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #999; }
+        .btn-close:hover { color: #333; }
+
+        .invoice-container { max-width: 950px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        @media print { #import-zone, #ai-results, .modal-overlay { display: none !important; } body { padding: 0; background: none; } .invoice-container { box-shadow: none; padding: 0; } }
+
+        .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #333; gap: 20px; }
+        .vendor-info { margin-left: auto; margin-right: 80px; }
+        .header img { height: 80px; width: 80px; flex-shrink: 0; }
+        [contenteditable="true"] { cursor: text; padding: 2px 4px; border-radius: 3px; transition: background 0.2s; }
+        .placeholder-bg { background-color: #eef7ff !important; }
+        [contenteditable="true"]:hover { background: #f0f7ff; outline: 1px dashed #0066cc; }
+        .company-info h1 { font-size: 24px; margin-bottom: 5px; color: #333; }
+        .company-details { font-size: 12px; color: #666; line-height: 1.5; }
+        .vendor-info { text-align: left; font-size: 12px; color: #666; white-space: nowrap; }
+        .top-section { display: flex; gap: 40px; margin-bottom: 5px; }
+        .client-section, .invoice-details { flex: 1; }
+        .section-title { font-size: 12px; font-weight: bold; color: #666; text-transform: uppercase; margin-bottom: 8px; }
+        .client-info { font-size: 12px; color: #333; line-height: 1.6; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; }
+        .section-heading { font-size: 13px; font-weight: bold; background: #f0f0f0; padding: 8px; margin-top: 5px; margin-bottom: 0; }
+        table thead { background: #e8e8e8; }
+        table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid #999; color: #333; }
+        table td { padding: 6px; border-bottom: 1px solid #ddd; white-space: nowrap; }
+        table tr.case-header td { background: #f9f9f9; font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid #bbb; }
+        table tr.subtotal td { background: #f0f0f0; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; padding-top: 6px; padding-bottom: 6px; }
+        table tr.grand-total td { background: #f0f0f0; color: #333; font-weight: bold; border-top: 2px solid #333; padding: 8px 6px; }
+        .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
+        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid #333; }
+        .blue-text { color: #0066cc; }
+        .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #333; }
+        .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 12px; }
+        .total-item { display: flex; justify-content: space-between; padding: 8px; background: #f9f9f9; border: 1px solid #ddd; }
+        #import-zone textarea + div button {
+            width: 100% !important;
+            min-width: 0 !important;
+            padding: 6px 8px !important;
+            box-sizing: border-box !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="import-zone">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 16px; color: #0066cc;">Data Import</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="active-model-display"></span>
+                <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
+            </div>
+        </div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
+        <textarea id="paste-area" placeholder="Paste spreadsheet data here (or drop a CSV file)..."></textarea>
+        <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
+            <button onclick="document.getElementById('pdf-input').click()" style="padding: 6px 8px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Scan PDF for PAE Info</button>
+            <button onclick="document.getElementById('paste-area').value = '';" style="padding: 6px 8px; cursor: pointer; background: #666; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Clear Box</button>
+            <button onclick="window.print()" style="padding: 6px 8px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Print Invoice</button>
+            <button onclick="exportToJson()" style="padding: 6px 8px; cursor: pointer; background: #17a2b8; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Export JSON</button>
+            <button onclick="document.getElementById('json-input').click()" style="padding: 6px 8px; cursor: pointer; background: #f39c12; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Import JSON</button>
+            <button onclick="resetForm()" style="padding: 6px 8px; cursor: pointer; background: #dc3545; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Clear Form</button>
+            <button onclick="sendToGoogleSheet()" style="padding: 6px 8px; cursor: pointer; background: #1d8548; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Send to Sheet</button>
+            <button onclick="pullFromGoogleSheet()" style="padding: 6px 8px; cursor: pointer; background: #008080; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">Pull from Sheet</button>
+            <button onclick="analyzeInvoiceAI()" style="padding: 6px 8px; cursor: pointer; background: #6f42c1; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">AI Analyze</button>
+        </div>
+            <input type="file" id="pdf-input" accept=".pdf" style="display:none">
+            <input type="file" id="json-input" accept=".json" style="display:none">
+            <span id="save-indicator">✔ Saved to Browser</span>
+        </div>
+        <div id="ai-results"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>App Settings</span>
+                <button class="btn-close" onclick="closeSettings()">&times;</button>
+            </div>
+            
+            <div class="modal-tabs">
+                <div class="modal-tab active" data-tab="webhook" onclick="switchTab('webhook')">Webhook Sync</div>
+                <div class="modal-tab" data-tab="ai" onclick="switchTab('ai')">AI Assistant</div>
+                <div class="modal-tab" data-tab="codes" onclick="switchTab('codes')">Name Codes</div>
+            </div>
+
+            <div id="tab-webhook" class="tab-content active">
+                <div class="settings-field">
+                    <label>Google Sheets Webhook URL</label>
+                    <div class="input-group">
+                        <input type="password" id="setting-webhook" placeholder="https://script.google.com/macros/s/..." readonly>
+                        <button class="btn-icon" onclick="toggleField('setting-webhook', 'visibility')" title="Toggle Visibility">👁️</button>
+                        <button class="btn-icon" id="lock-webhook" onclick="toggleField('setting-webhook', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-test" onclick="testWebhook()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
+                    </div>
+                </div>
+                <div class="instructions" style="font-size: 10px;">Endpoint for syncing invoice data to Google Sheets.</div>
+            </div>
+
+            <div id="tab-codes" class="tab-content">
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">Name to Code Mapping</label>
+                        <button onclick="addNameCodeRow()" style="padding: 4px 8px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; font-size: 11px;">+ Add</button>
+                    </div>
+                    <div id="name-codes-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px;">
+                        <!-- Name code rows inserted here -->
+                    </div>
+                </div>
+                <div class="instructions" style="font-size: 10px;">Client and investigator names will be replaced with codes on import.</div>
+            </div>
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">AI Provider & Model</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5;">
+                            <optgroup label="Google Gemini">
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </optgroup>
+                            <optgroup label="OpenAI ChatGPT">
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                            </optgroup>
+                            <optgroup label="Anthropic Claude">
+                                <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
+                                <option value="claude-3-opus-latest">Claude 3 Opus</option>
+                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                            </optgroup>
+                            <optgroup label="xAI Grok">
+                                <option value="grok-beta">Grok Beta</option>
+                            </optgroup>
+                            <optgroup label="DeepSeek">
+                                <option value="deepseek-chat">DeepSeek Chat</option>
+                                <option value="deepseek-coder">DeepSeek Coder</option>
+                            </optgroup>
+                            <optgroup label="Perplexity">
+                                <option value="llama-3.1-sonar-large-128k-online">Sonar Large Online</option>
+                            </optgroup>
+                            <optgroup label="Custom / Local (OpenAI Compatible)">
+                                <option value="custom">Custom Endpoint</option>
+                            </optgroup>
+                        </select>
+                        <button class="btn-icon" id="lock-ai-model" onclick="toggleField('setting-ai-model', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">AI API Key</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="setting-ai-key" placeholder="Enter your API Key" readonly>
+                        <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">👁️</button>
+                        <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-test" onclick="testAI()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
+                    </div>
+                </div>
+                <div class="settings-field" id="group-ai-base-url" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">API Base URL (e.g., http://localhost:11434/v1)</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="setting-ai-base-url" placeholder="https://api.openai.com/v1" readonly>
+                        <button class="btn-icon" id="lock-ai-base-url" onclick="toggleField('setting-ai-base-url', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <div class="settings-field" style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                            <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span></label>
+                            <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                        </div>
+                        <div class="input-group">
+                            <input type="range" id="setting-ai-temp" min="0" max="2" step="0.1" value="0.7" disabled oninput="document.getElementById('val-ai-temp').textContent=this.value">
+                            <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">🔒</button>
+                        </div>
+                    </div>
+                    <div class="settings-field" style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                            <label style="margin-bottom: 0;">Max Tokens</label>
+                            <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                        </div>
+                        <div class="input-group">
+                            <input type="number" id="setting-ai-tokens" placeholder="2048" disabled>
+                            <button class="btn-icon" id="lock-ai-tokens" onclick="toggleField('setting-ai-tokens', 'lock')" title="Unlock Field">🔒</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">System Instructions (Analysis Prompt)</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <textarea id="setting-ai-instructions" rows="3" readonly style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5; resize: vertical;"></textarea>
+                        <button class="btn-icon" id="lock-ai-instructions" onclick="toggleField('setting-ai-instructions', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+                <div class="instructions" style="font-size: 10px;">Configure your AI provider and parameters for invoice auditing.</div>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="closeSettings()" style="padding: 8px 16px; cursor: pointer; background: #eee; border: 1px solid #ddd; border-radius: 4px;">Cancel</button>
+                <button onclick="saveSettings()" style="padding: 8px 16px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px;">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="invoice-container">
+        <div class="header">
+            <img src="logo.jpg" alt="Logo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' rx=\'20\' fill=\'%230066cc\'/%3E%3Ccircle cx=\'40\' cy=\'40\' r=\'20\' fill=\'none\' stroke=\'white\' stroke-width=\'6\'/%3E%3Cline x1=\'55\' y1=\'55\' x2=\'80\' y2=\'80\' stroke=\'white\' stroke-width=\'10\' stroke-linecap=\'round\'/%3E%3C/svg%3E'; this.onerror=null;">
+            <div class="company-info">
+                <h1>THOMAS LEE INVESTIGATIONS</h1>
+                <div class="company-details">
+                    427 Rodale Dr. Eagle Point, OR 97524<br>
+                    tlee.investigations@gmail.com<br>
+                    541-324-7636
+                </div>
+            </div>
+            <div class="vendor-info">
+                <strong>Vendor #:</strong> <span style="color: red;">3664110013-000</span><br>
+                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Est. Trav Costs:</strong> <span id="field-trav-costs" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <div id="pae-date-note" style="color: #888; font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since pae was produced</div>
+            </div>
+        </div>
+        <div class="top-section">
+            <div class="client-section">
+                <div class="section-title">Client Information</div>
+                <div class="client-info">
+                    <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                </div>
+            </div>
+            <div class="invoice-details">
+                <div class="section-title">Invoice Details</div>
+                <div class="client-info">
+                    <strong>Investigator:</strong> <span id="field-investigator" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
+                    <strong>Invoice #:</strong> <span id="field-invoice-num" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
+                    <strong>Invoice Date:</strong> <span id="field-invoice-date" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Date Range:</strong> <span id="field-date-range" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-heading">SERVICE HOURS</h2>
+        <table id="table-hours">
+            <thead>
+                <tr><th style="width: 80px;">Date</th><th style="width: 120px;">Category</th><th>Description</th><th class="hours-col">Hours</th></tr>
+            </thead>
+            <tbody>
+                <!-- Case data will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <h2 class="section-heading">MILEAGE</h2>
+        <table id="table-mileage">
+            <thead>
+                <tr><th style="width: 80px;">Date</th><th>Route</th><th class="miles-col">Miles</th></tr>
+            </thead>
+            <tbody>
+                <!-- Case data will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <h2 class="section-heading">OUT OF POCKET EXPENSES</h2>
+        <table id="table-expenses">
+            <thead>
+                <tr><th style="width: 80px;">Date</th><th style="width: 110px;">Category</th><th>Description</th><th style="width: 60px;">Qty</th><th class="amount-col">Amount</th></tr>
+            </thead>
+            <tbody>
+                <!-- Case data will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <h2 class="section-heading">INVOICE TOTALS</h2>
+        <table class="invoice-totals-table">
+            <thead>
+                <tr><th style="width: 80px;"></th><th style="width: 120px;"></th><th style="flex: 1;">Description</th><th style="width: 100px;">Qty</th><th style="width: 100px;">Rate</th><th class="amount-col">Amount</th></tr>
+            </thead>
+            <tbody>
+                <tr><td contenteditable="true" style="white-space: nowrap;">B&W Copies: 0</td><td contenteditable="true"></td><td contenteditable="true">Hours @ $55</td><td style="text-align: center;" contenteditable="true">0.0 hrs</td><td style="text-align: center;" contenteditable="true">$55.00</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true" style="white-space: nowrap;">Color Copies: 0</td><td contenteditable="true"></td><td contenteditable="true">Hours @ $59</td><td style="text-align: center;" contenteditable="true">0.0 hrs</td><td style="text-align: center;" contenteditable="true">$59.00</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Mileage @ 2025 Rate</td><td style="text-align: center;" contenteditable="true">0.0 mi</td><td style="text-align: center;" contenteditable="true">$0.70</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Mileage @ 2026 Rate</td><td style="text-align: center;" contenteditable="true">0 mi</td><td style="text-align: center;" contenteditable="true">$0.725</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Expenses</td><td style="text-align: center;" contenteditable="true">—</td><td style="text-align: center;" contenteditable="true">—</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr class="grand-total"><td></td><td></td><td style="text-align: right;">TOTAL:</td><td style="text-align: center;">—</td><td style="text-align: center;">—</td><td class="amount-col" id="field-grand-total">$0.00</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 350px;">
+            <div class="modal-header">
+                <span>Confirm Action</span>
+                <button class="btn-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin: 0; line-height: 1.6;">Are you sure?</p>
+            </div>
+            <div class="modal-actions">
+                <button onclick="closeConfirmModal()" style="padding: 8px 16px; cursor: pointer; background: #eee; border: 1px solid #ddd; border-radius: 4px;">No</button>
+                <button id="confirm-yes" onclick="confirmYes()" style="padding: 8px 16px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px;">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const CONFIG = {
+            RATE_EARLY: 55,
+            RATE_LATE: 59,
+            RATE_CUTOFF_DATE: new Date(2025, 7, 1), // August 1st, 2025
+            MILEAGE_2025: 0.70,
+            MILEAGE_2026: 0.725,
+            COPY_RATE_BW: 0.20,
+            COPY_RATE_COLOR: 1.00,
+            GOOGLE_WEBHOOK_URL: '', // Add your Apps Script Web App URL here
+            AI_API_KEY: '', // Add your Gemini API Key here
+            AI_MODEL: 'gemini-1.5-flash',
+            AI_INSTRUCTIONS: '',
+            AI_BASE_URL: '',
+            AI_TEMPERATURE: 0.7,
+            AI_MAX_TOKENS: 2048
+        };
+
+        // Helper function to get or create case header and subtotal rows
+        function getOrCreateCaseRows(tableBody, caseNumber, colSpanData) {
+            let caseHeader = tableBody.querySelector(`.case-header[data-case-id="${caseNumber}"]`);
+            let subtotalRow = tableBody.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+
+            if (!caseHeader) {
+                // Create case header
+                caseHeader = document.createElement('tr');
+                caseHeader.classList.add('case-header');
+                caseHeader.setAttribute('data-case-id', caseNumber);
+                caseHeader.innerHTML = `<td colspan="${colSpanData}">Case: ${caseNumber}</td>`;
+                tableBody.appendChild(caseHeader);
+            }
+
+            if (!subtotalRow) {
+                subtotalRow = document.createElement('tr');
+                subtotalRow.classList.add('subtotal');
+                subtotalRow.setAttribute('data-case-id', caseNumber);
+                
+                const tableId = tableBody.closest('table').id;
+                if (tableId === 'table-hours') {
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Hours @ $${CONFIG.RATE_EARLY}: 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hours @ $${CONFIG.RATE_LATE}: 0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="hours-col" contenteditable="true">0.0</td>`;
+                } else if (tableId === 'table-mileage') {
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Mileage @ $${CONFIG.MILEAGE_2025} (2025): 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mileage @ $${CONFIG.MILEAGE_2026} (2026): 0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="miles-col" contenteditable="true">0.0</td>`;
+                } else if (tableId === 'table-expenses') {
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;">Subtotal:</td><td class="amount-col" contenteditable="true">$0.00</td>`;
+                }
+                tableBody.appendChild(subtotalRow);
+            }
+            return { caseHeader, subtotalRow };
+        }
+
+function updateInvoiceTotals() {
+            let totalHours55 = 0, totalHours59 = 0;
+            let totalMiles2025 = 0, totalMiles2026 = 0;
+            let totalExpenses = 0;
+            let allServiceDates = [];
+
+            // Process Service Hours
+            const serviceTable = document.getElementById('table-hours');
+            const serviceCaseHeaders = serviceTable.querySelectorAll('.case-header');
+            serviceCaseHeaders.forEach(caseHeader => {
+                const caseNumber = caseHeader.dataset.caseId;
+                let caseHours55 = 0, caseHours59 = 0;
+                let currentRow = caseHeader.nextElementSibling;
+                while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                    const dateCell = currentRow.cells[0].textContent.trim();
+                    const hoursCell = currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0';
+                    const hours = parseFloat(hoursCell) || 0;
+
+                    if (dateCell && hours > 0) {
+                        const date = new Date(dateCell);
+                        if (!isNaN(date.getTime())) allServiceDates.push(date);
+                        const isEarly = date < CONFIG.RATE_CUTOFF_DATE;
+                        if (isEarly) caseHours55 += hours;
+                        else caseHours59 += hours;
+                    }
+                    currentRow = currentRow.nextElementSibling;
+                }
+                totalHours55 += caseHours55;
+                totalHours59 += caseHours59;
+
+                // Find the subtotal row specifically for this case group
+                const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
+                                    currentRow :
+                                    serviceTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+                if (subtotalRow && subtotalRow.cells.length >= 2) {
+                    subtotalRow.cells[0].innerHTML = `<span class="blue-text">Hours @ $${CONFIG.RATE_EARLY}: ${caseHours55.toFixed(1)}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hours @ $${CONFIG.RATE_LATE}: ${caseHours59.toFixed(1)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:`;
+                    subtotalRow.cells[1].textContent = (caseHours55 + caseHours59).toFixed(1);
+                }
+            });
+
+            // Update Date Range automatically from ALL service entries
+            if (allServiceDates.length > 0) {
+                const minDate = new Date(Math.min(...allServiceDates));
+                const maxDate = new Date(Math.max(...allServiceDates));
+                const formatDate = (d) => `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()}`;
+                const rangeEl = document.getElementById('field-date-range');
+                if (rangeEl) rangeEl.textContent = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
+            }
+
+            // Process Mileage
+            const mileageTable = document.getElementById('table-mileage');
+            const mileageCaseHeaders = mileageTable.querySelectorAll('.case-header');
+            mileageCaseHeaders.forEach(caseHeader => {
+                const caseNumber = caseHeader.dataset.caseId;
+                let caseMiles2025 = 0, caseMiles2026 = 0;
+                let currentRow = caseHeader.nextElementSibling;
+                while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                    const dateCell = currentRow.cells[0].textContent.trim();
+                    const milesCell = currentRow.cells[2] ? currentRow.cells[2].textContent.trim() : '0';
+                    const miles = parseFloat(milesCell) || 0;
+
+                    if (dateCell && miles > 0) {
+                        const date = new Date(dateCell);
+                        if (!isNaN(date.getTime())) allServiceDates.push(date);
+                        const year = date.getFullYear();
+                        if (year === 2025) caseMiles2025 += miles;
+                        else if (year === 2026) caseMiles2026 += miles;
+                    }
+                    currentRow = currentRow.nextElementSibling;
+                }
+                totalMiles2025 += caseMiles2025;
+                totalMiles2026 += caseMiles2026;
+
+                // Find the subtotal row specifically for this case group
+                const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
+                                    currentRow :
+                                    mileageTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+                if (subtotalRow && subtotalRow.cells.length >= 2) {
+                    subtotalRow.cells[0].innerHTML = `<span class="blue-text">Mileage @ $${CONFIG.MILEAGE_2025} (2025): ${caseMiles2025.toFixed(1)}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mileage @ $${CONFIG.MILEAGE_2026} (2026): ${caseMiles2026.toFixed(1)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:`;
+                    subtotalRow.cells[1].textContent = (caseMiles2025 + caseMiles2026).toFixed(1);
+                }
+            });
+
+            // Process Expenses
+            const expenseTable = document.getElementById('table-expenses');
+            const expenseCaseHeaders = expenseTable.querySelectorAll('.case-header');
+            let totalBW = 0, totalColor = 0;
+            expenseCaseHeaders.forEach(caseHeader => {
+                const caseNumber = caseHeader.dataset.caseId;
+                let caseExpenses = 0;
+                let caseBW = 0, caseColor = 0;
+                let currentRow = caseHeader.nextElementSibling;
+                while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                    const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
+                    const category = currentRow.cells[1] ? currentRow.cells[1].textContent.toLowerCase() : '';
+                    const description = currentRow.cells[2] ? currentRow.cells[2].textContent.toLowerCase() : '';
+                    const qty = parseFloat(currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0') || 0;
+
+                    if (dateCell) {
+                        const date = new Date(dateCell);
+                        if (!isNaN(date.getTime())) allServiceDates.push(date);
+                    }
+
+                    if (category.includes('photocopy') || category.includes('copies')) {
+                        const rate = category.includes('color') ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                        const rowAmtCell = currentRow.cells[4];
+                        if (rowAmtCell && (rowAmtCell.textContent.trim() === '$0.00' || rowAmtCell.textContent.trim() === '' || rowAmtCell.dataset.auto === 'true')) {
+                            rowAmtCell.textContent = '$' + (qty * rate).toFixed(2);
+                            rowAmtCell.dataset.auto = 'true';
+                        }
+
+                        if (description.includes('b&w') || category.includes('b&w')) {
+                            totalBW += qty;
+                            caseBW += qty;
+                        } else if (description.includes('color') || category.includes('color')) {
+                            totalColor += qty;
+                            caseColor += qty;
+                        }
+                    }
+
+                    const amountCell = currentRow.cells[4];
+                    if (amountCell) {
+                        const amount = parseFloat(amountCell.textContent.replace(/[^\d.-]/g, '')) || 0;
+                        caseExpenses += amount;
+                    }
+                    currentRow = currentRow.nextElementSibling;
+                }
+                totalExpenses += caseExpenses;
+
+                // Find the subtotal row specifically for this case group
+                const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
+                                    currentRow :
+                                    expenseTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+                if (subtotalRow && subtotalRow.cells.length >= 2) {
+                    let breakdown = [];
+                    if (caseBW > 0) breakdown.push(`B&W: ${caseBW}`);
+                    if (caseColor > 0) breakdown.push(`Color: ${caseColor}`);
+                    const labelText = breakdown.length > 0 ? `${breakdown.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;` : '';
+                    subtotalRow.cells[0].innerHTML = `${labelText}Subtotal:`;
+                    subtotalRow.cells[1].textContent = '$' + caseExpenses.toFixed(2);
+                }
+            });
+
+            // Update totals table
+            const totalsTable = document.querySelector('.invoice-totals-table');
+            const totalRows = totalsTable.querySelectorAll('tbody tr');
+
+            totalRows[0].cells[0].textContent = `B&W Copies: ${totalBW} ($${(totalBW * CONFIG.COPY_RATE_BW).toFixed(2)})`;
+            totalRows[1].cells[0].textContent = `Color Copies: ${totalColor} ($${(totalColor * CONFIG.COPY_RATE_COLOR).toFixed(2)})`;
+
+            totalRows[0].cells[2].textContent = `Investigator Service - Hours @ $${CONFIG.RATE_EARLY}`;
+            totalRows[0].cells[3].textContent = totalHours55.toFixed(1) + ' hrs';
+            totalRows[0].cells[4].textContent = `$${CONFIG.RATE_EARLY.toFixed(2)}`;
+            totalRows[0].cells[5].textContent = '$' + (totalHours55 * CONFIG.RATE_EARLY).toFixed(2);
+
+            totalRows[1].cells[2].textContent = `Investigator Service - Hours @ $${CONFIG.RATE_LATE}`;
+            totalRows[1].cells[3].textContent = totalHours59.toFixed(1) + ' hrs';
+            totalRows[1].cells[4].textContent = `$${CONFIG.RATE_LATE.toFixed(2)}`;
+            totalRows[1].cells[5].textContent = '$' + (totalHours59 * CONFIG.RATE_LATE).toFixed(2);
+
+            totalRows[2].cells[3].textContent = totalMiles2025.toFixed(1) + ' mi';
+            totalRows[2].cells[5].textContent = '$' + (totalMiles2025 * CONFIG.MILEAGE_2025).toFixed(2);
+
+            totalRows[3].cells[3].textContent = totalMiles2026.toFixed(1) + ' mi';
+            totalRows[3].cells[5].textContent = '$' + (totalMiles2026 * CONFIG.MILEAGE_2026).toFixed(2);
+
+            totalRows[4].cells[2].textContent = 'Out of Pocket Expenses';
+            totalRows[4].cells[5].textContent = '$' + totalExpenses.toFixed(2);
+
+            const grandTotal = (totalHours55 * CONFIG.RATE_EARLY) + (totalHours59 * CONFIG.RATE_LATE) +
+                               (totalMiles2025 * CONFIG.MILEAGE_2025) + (totalMiles2026 * CONFIG.MILEAGE_2026) + totalExpenses;
+            totalRows[5].cells[0].textContent = '';
+            totalRows[5].cells[1].textContent = '';
+            totalRows[5].cells[2].textContent = '';
+            totalRows[5].cells[3].textContent = '';
+            totalRows[5].cells[4].textContent = 'TOTAL:';
+            totalRows[5].cells[4].style.textAlign = 'right';
+            totalRows[5].cells[5].textContent = '$' + grandTotal.toFixed(2);
+            
+            // Apply continuous bottom border to all cells in grand total row
+            for (let i = 0; i < 6; i++) {
+                totalRows[5].cells[i].style.borderBottom = '2px solid #333';
+            }
+
+            // Overage/remaining status in left cells of grand total row (always visible when auth hours set)
+            const authHoursEl = document.getElementById('field-auth-hours');
+            const authHours = parseFloat(authHoursEl ? authHoursEl.textContent : '') || 0;
+            const totalHoursBilled = totalHours55 + totalHours59;
+            
+            if (authHours > 0) {
+                if (totalHoursBilled > authHours) {
+                    const overage = (totalHoursBilled - authHours).toFixed(1);
+                    totalRows[5].cells[0].textContent = `⚠️ +${overage} hrs over auth`;
+                    totalRows[5].cells[0].style.cssText = 'background: #fff3cd; color: #856404; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #ffeeba; border-bottom: 2px solid #ffeeba;';
+                    totalRows[5].cells[1].style.cssText = 'background: #fff3cd; border-top: 2px solid #ffeeba; border-bottom: 2px solid #ffeeba; border-left: none; border-right: none;';
+                } else {
+                    const remaining = (authHours - totalHoursBilled).toFixed(1);
+                    totalRows[5].cells[0].textContent = `✓ ${remaining} hrs remaining`;
+                    totalRows[5].cells[0].style.cssText = 'background: #d4edda; color: #155724; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #333; border-bottom: 2px solid #333;';
+                    totalRows[5].cells[1].style.cssText = 'background: #d4edda; border-top: 2px solid #333; border-bottom: 2px solid #333; border-left: none; border-right: none;';
+                }
+            } else {
+                totalRows[5].cells[0].textContent = '';
+                totalRows[5].cells[0].style.cssText = '';
+                totalRows[5].cells[1].style.cssText = '';
+            }
+
+            // Update placeholder background visibility
+            document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+                const placeholders = ["click here to enter", "Drop PAE or click to enter"];
+                if (placeholders.includes(el.textContent.trim())) {
+                    el.classList.add('placeholder-bg');
+                } else {
+                    el.classList.remove('placeholder-bg');
+                }
+            });
+
+            // Auto-save
+            saveInvoiceData();
+        }
+
+        // Shared logic to extract header info from text (PDF or Paste)
+        function extractHeaderInfo(fullText) {
+            const patterns = {
+                client: /Client:\s*([^:\n]+?)(?=Case|Attorney|PAE|PA|County|$)/i,
+                case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*(\S+)/i,
+                attorney: /Attorney:\s*([^:\n]+?)(?=PAE|PA|Case|Client|Authorization|$)/i,
+                pae: /(?:Authorization\s*No|PAE|PA)\s*(?:#|No\.?|Number)?\s*:?\s*(\d+)/i,
+                'trav-costs': /Est\.?\s*Trav(?:el)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
+                'auth-serv': /Auth(?:orized)?\s*Serv(?:ice)?\s*Amount\s*(?:Not\s*to\s*Exceed)?\s*:\s*([\$0-9,.]+)/i,
+                'auth-hours': /(?:Auth(?:orized)?\s*(?:Hours|Hrs)|Maximum\s*Quantity)\s*:?\s*([\d,.]+)/i,
+                'total-auth': /Total\s*Auth(?:orized)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
+                'pae-date': /(?:Effective|Processed)\s*Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
+            };
+
+            let found = false;
+            Object.entries(patterns).forEach(([key, regex]) => {
+                const match = fullText.match(regex);
+                if (match && match[1]) {
+                    const val = match[1].trim();
+                    let targetId = '';
+                    
+                    if (key === 'pae') {
+                        targetId = 'field-pae';
+                        const headerPae = document.getElementById('field-pae-header');
+                        if (headerPae) headerPae.textContent = val;
+                    } else if (key === 'pae-date') {
+                        const paeDate = new Date(val);
+                        const noteEl = document.getElementById('pae-date-note');
+                        if (noteEl && !isNaN(paeDate.getTime())) {
+                            noteEl.style.display = paeDate < CONFIG.RATE_CUTOFF_DATE ? 'block' : 'none';
+                        }
+                        // Auto-fill Invoice Date if it's currently a placeholder
+                        const invDateEl = document.getElementById('field-invoice-date');
+                        if (invDateEl && (invDateEl.textContent.trim() === "" || invDateEl.textContent.includes("enter"))) {
+                            invDateEl.textContent = val;
+                        }
+                        found = true;
+                        return;
+                    } else {
+                        targetId = `field-${key}`;
+                    }
+
+                    const el = document.getElementById(targetId);
+                    if (el) {
+                        el.textContent = val;
+                        found = true;
+                    }
+                }
+            });
+            return found;
+        }
+
+        function getInvoiceState() {
+            const state = {};
+
+            // Save header fields
+            const headerFields = [
+                'field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth',
+                'field-client', 'field-case', 'field-attorney', 'field-pae',
+                'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range',
+                'field-grand-total'
+            ];
+            headerFields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) state[id] = el.textContent;
+            });
+
+            // Save table data
+            state.tables = { hours: [], mileage: [], expenses: [] };
+            const tableMap = {
+                'table-hours': 'hours',
+                'table-mileage': 'mileage',
+                'table-expenses': 'expenses'
+            };
+
+            Object.entries(tableMap).forEach(([tableId, key]) => {
+                const tableBody = document.getElementById(tableId).querySelector('tbody');
+                const caseHeaders = tableBody.querySelectorAll('.case-header');
+                caseHeaders.forEach(caseHeader => {
+                    const caseNumber = caseHeader.dataset.caseId;
+                    const caseData = { caseNumber: caseNumber, rows: [] };
+                    let currentRow = caseHeader.nextElementSibling;
+                    while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                        const rowCells = Array.from(currentRow.cells).map(cell => cell.textContent);
+                        caseData.rows.push(rowCells);
+                        currentRow = currentRow.nextElementSibling;
+                    }
+                    state.tables[key].push(caseData);
+                });
+            });
+            return state;
+        }
+
+        function saveInvoiceData() {
+            const invoiceState = getInvoiceState();
+
+            localStorage.setItem('invoiceData', JSON.stringify(invoiceState));
+
+            // DATA PERSISTENCE GUARD:
+            // Don't auto-save if the invoice is currently empty. This prevents 
+            // overwriting your saved data with a blank screen during a refresh.
+            if (document.querySelectorAll('.case-header').length === 0) {
+                return;
+            }
+
+            const indicator = document.getElementById('save-indicator');
+            if (indicator) {
+                indicator.classList.add('visible');
+                clearTimeout(indicator.saveTimeout);
+                indicator.saveTimeout = setTimeout(() => indicator.classList.remove('visible'), 2000);
+            }
+        }
+
+        async function sendToGoogleSheet() {
+            if (!CONFIG.GOOGLE_WEBHOOK_URL) {
+                alert("Please configure the GOOGLE_WEBHOOK_URL in the CONFIG script block.");
+                return;
+            }
+
+            const state = getInvoiceState();
+            state.app_source = "InvoiceCreator"; // Identifies the source for the shared webhook
+            const indicator = document.getElementById('save-indicator');
+            
+            try {
+                indicator.textContent = "⏳ Sending to Google Sheets...";
+                indicator.classList.add('visible');
+
+                const response = await fetch(CONFIG.GOOGLE_WEBHOOK_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Essential for Google Apps Script Web Apps
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state)
+                });
+
+                indicator.textContent = "✔ Successfully synced with Sheet";
+                setTimeout(() => {
+                    indicator.classList.remove('visible');
+                    indicator.textContent = "✔ Saved to Browser";
+                }, 3000);
+            } catch (error) {
+                console.error("Webhook Error:", error);
+                alert("Failed to send data to Google Sheets.");
+            }
+        }
+
+        async function pullFromGoogleSheet() {
+            if (!CONFIG.GOOGLE_WEBHOOK_URL) {
+                alert("Please configure the GOOGLE_WEBHOOK_URL in the Settings.");
+                return;
+            }
+
+            const indicator = document.getElementById('save-indicator');
+            try {
+                indicator.textContent = "⏳ Pulling from Google Sheets...";
+                indicator.classList.add('visible');
+
+                // Note: Google Apps Script usually requires a GET request to return data
+                // We can append a type parameter to help the script route the request
+                const response = await fetch(CONFIG.GOOGLE_WEBHOOK_URL + "?type=invoice");
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const data = await response.json();
+                if (data) {
+                    // If the data is an array of logs, it might need translation
+                    // But here we assume it returns the same state object we sent
+                    applyInvoiceState(data);
+                    indicator.textContent = "✔ Data pulled successfully";
+                }
+            } catch (error) {
+                console.error("Pull Error:", error);
+                alert("Failed to pull data from Google Sheets. Ensure your script supports GET requests and CORS.");
+                indicator.textContent = "✖ Pull failed";
+            } finally {
+                setTimeout(() => {
+                    indicator.classList.remove('visible');
+                    indicator.textContent = "✔ Saved to Browser";
+                }, 3000);
+            }
+        }
+
+        async function analyzeInvoiceAI() {
+            if (!CONFIG.AI_API_KEY) {
+                alert("Please configure the AI_API_KEY in the CONFIG script block.");
+                return;
+            }
+
+            const state = getInvoiceState();
+            const resultsDiv = document.getElementById('ai-results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<span class="ai-loading">AI is analyzing invoice data for patterns and discrepancies...</span>';
+
+            const systemPrompt = CONFIG.AI_INSTRUCTIONS || "Analyze this legal investigation invoice data and provide a concise summary. Check for potential billing errors, summarize total hours per case, and suggest if any mileage entries look unusual based on the descriptions.";
+            const prompt = `${systemPrompt}\n\nInvoice Data: ${JSON.stringify(state, null, 2)}`;
+
+            try {
+                const model = CONFIG.AI_MODEL || 'gemini-1.5-flash';
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+                const temperature = CONFIG.AI_TEMPERATURE || 0.7;
+                const max_tokens = CONFIG.AI_MAX_TOKENS || 2048;
+                const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, ''); // Clean trailing slash
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CONFIG.AI_API_KEY}`;
+                    body = JSON.stringify({ 
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature, maxOutputTokens: max_tokens },
+                        safetySettings: [ // Default safety settings for Gemini
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ]
+                    });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = CONFIG.AI_API_KEY;
+                    headers['anthropic-version'] = '2023-06-01';
+                    body = JSON.stringify({ model, max_tokens, temperature, messages: [{ role: 'user', content: prompt }] });
+                } else {
+                    // OpenAI Compatible API (GPT, Grok, DeepSeek, Perplexity, Custom)
+                    if (model === 'custom') {
+                        if (!baseUrl) {
+                            resultsDiv.innerHTML = "<strong>Error:</strong> Custom endpoint selected but API Base URL is empty.";
+                            return;
+                        }
+                        url = baseUrl + '/chat/completions';
+                    } else if (model.startsWith('gpt')) {
+                        url = 'https://api.openai.com/v1/chat/completions';
+                    } else if (model.startsWith('deepseek')) {
+                        url = 'https://api.deepseek.com/chat/completions';
+                    } else if (model.includes('sonar')) { // Perplexity
+                        url = 'https://api.perplexity.ai/chat/completions';
+                    } else if (model.startsWith('grok')) {
+                        url = 'https://api.x.ai/v1/chat/completions';
+                    } else {
+                        resultsDiv.innerHTML = `<strong>Error:</strong> Unsupported model selected: ${model}`;
+                        return;
+                    }
+
+                    headers['Authorization'] = `Bearer ${CONFIG.AI_API_KEY}`;
+                    body = JSON.stringify({ 
+                        model: model === 'custom' ? 'default' : model, 
+                        messages: [{ role: 'user', content: prompt }],
+                        temperature,
+                        max_tokens
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    const errorMessage = errorData.error?.message || response.statusText;
+                    throw new Error(`${errorMessage}`);
+                }
+
+                const result = await response.json();
+                
+                let aiText = '';
+                if (model.startsWith('gemini')) aiText = result.candidates[0].content.parts[0].text;
+                else if (model.startsWith('claude')) aiText = result.content[0].text;
+                else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content; // Standard OpenAI format
+
+                resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
+            } catch (error) {
+                console.error("AI Error:", error);
+                resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            }
+        }
+
+        function applyInvoiceState(invoiceState) {
+            // Load header fields
+            Object.entries(invoiceState).forEach(([id, value]) => {
+                if (id !== 'tables') {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = value;
+                }
+            });
+
+            // Clear and rebuild tables
+            ['table-hours', 'table-mileage', 'table-expenses'].forEach(id => {
+                const tbody = document.getElementById(id).querySelector('tbody');
+                if (tbody) tbody.innerHTML = '';
+            });
+
+            if (invoiceState.tables) {
+                const configs = {
+                    hours: { id: 'table-hours', cols: 4, class: 'hours-col', colIdx: 3 },
+                    mileage: { id: 'table-mileage', cols: 3, class: 'miles-col', colIdx: 2 },
+                    expenses: { id: 'table-expenses', cols: 5, class: 'amount-col', colIdx: 4 }
+                };
+
+                Object.entries(configs).forEach(([key, cfg]) => {
+                    const tableData = invoiceState.tables[key];
+                    if (!tableData) return;
+                    const tbody = document.getElementById(cfg.id).querySelector('tbody');
+                    tableData.forEach(caseGroup => {
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseGroup.caseNumber, cfg.cols);
+                        caseGroup.rows.forEach(rowData => {
+                            const tr = document.createElement('tr');
+                            rowData.forEach((cellText, idx) => {
+                                const td = document.createElement('td');
+                                td.textContent = cellText;
+                                    td.contentEditable = "true";
+                                if (idx === cfg.colIdx) td.className = cfg.class;
+                                tr.appendChild(td);
+                            });
+                            subtotalRow.insertAdjacentElement('beforebegin', tr);
+                        });
+                    });
+                });
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            const targetTab = document.querySelector(`.modal-tab[data-tab="${tabId}"]`);
+            const targetContent = document.getElementById(`tab-${tabId}`);
+            
+            if (targetTab) targetTab.classList.add('active');
+            if (targetContent) targetContent.classList.add('active');
+        }
+
+        function toggleBaseUrlField(model) {
+            const group = document.getElementById('group-ai-base-url');
+            if (group) group.style.display = (model === 'custom') ? 'block' : 'none';
+        }
+
+        function openSettings() {
+            document.getElementById('setting-webhook').value = CONFIG.GOOGLE_WEBHOOK_URL || '';
+            document.getElementById('setting-ai-key').value = CONFIG.AI_API_KEY || '';
+            
+            const modelEl = document.getElementById('setting-ai-model');
+            const instrEl = document.getElementById('setting-ai-instructions');
+            const baseUrlEl = document.getElementById('setting-ai-base-url');
+            const tempEl = document.getElementById('setting-ai-temp');
+            const tokensEl = document.getElementById('setting-ai-tokens');
+            
+            if (modelEl) modelEl.value = CONFIG.AI_MODEL || 'gemini-1.5-flash';
+            if (instrEl) instrEl.value = CONFIG.AI_INSTRUCTIONS || '';
+            if (baseUrlEl) baseUrlEl.value = CONFIG.AI_BASE_URL || '';
+            if (tempEl) {
+                tempEl.value = CONFIG.AI_TEMPERATURE || 0.7;
+                document.getElementById('val-ai-temp').textContent = tempEl.value;
+            }
+            if (tokensEl) tokensEl.value = CONFIG.AI_MAX_TOKENS || 2048;
+
+            toggleBaseUrlField(modelEl.value);
+            
+            // Default to the first tab
+            switchTab('webhook');
+
+            // Ensure fields are locked when opening
+            ['setting-webhook', 'setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'].forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                
+                const suffix = id.replace('setting-', '');
+                const lockBtn = document.getElementById('lock-' + suffix);
+
+                const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number'; // Use disabled for these types
+                
+                if (useDisabled) {
+                    input.disabled = true;
+                } else {
+                    input.readOnly = true;
+                    if (id === 'setting-webhook' || id === 'setting-ai-key') input.type = 'password';
+                }
+                input.style.background = '#f5f5f5';
+                if (lockBtn) lockBtn.textContent = '🔒';
+            });
+            
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+        function toggleField(id, action) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const suffix = id.replace('setting-', '');
+            const lockBtn = document.getElementById('lock-' + suffix);
+
+            if (action === 'visibility') {
+                if (input.tagName === 'INPUT') {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                }
+            } else if (action === 'lock') {
+                // Detect if we should use disabled or readOnly based on element type
+                const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number';
+                const isLocked = useDisabled ? input.disabled : input.readOnly;
+                const newState = !isLocked;
+                
+                if (useDisabled) {
+                    input.disabled = newState;
+                } else {
+                    input.readOnly = newState;
+                }
+                
+                input.style.background = newState ? '#f5f5f5' : '#fff';
+                
+                if (lockBtn) lockBtn.textContent = newState ? '🔒' : '🔓';
+                if (!newState) input.focus();
+            }
+        }
+
+        async function testWebhook() {
+            const url = document.getElementById('setting-webhook').value.trim();
+            if (!url) return alert("Enter a URL first.");
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ test: true, timestamp: new Date().toISOString() })
+                });
+                alert("Webhook test signal sent! (Check your Google Sheet for the test entry)");
+            } catch (e) {
+                alert("Test failed: " + e.message);
+            }
+        }
+
+        async function testAI() {
+            const key = document.getElementById('setting-ai-key').value.trim();
+            const model = document.getElementById('setting-ai-model').value;
+            if (!key) return alert("Enter an API key first.");
+
+            try {
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+                const testPrompt = "Respond with 'Connected'";
+                const baseUrl = document.getElementById('setting-ai-base-url').value.trim();
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                    body = JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }] });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = key;
+                    headers['anthropic-version'] = '2023-06-01';
+                    body = JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: testPrompt }] });
+                } else {
+                    // OpenAI Compatible
+                    if (model === 'custom') {
+                        url = baseUrl.replace(/\/$/, '') + '/chat/completions';
+                    } else if (model.startsWith('gpt')) {
+                        url = 'https://api.openai.com/v1/chat/completions';
+                    } else if (model.startsWith('grok')) {
+                        url = 'https://api.x.ai/v1/chat/completions';
+                    } else if (model.startsWith('deepseek')) {
+                        url = 'https://api.deepseek.com/chat/completions';
+                    } else if (model.includes('sonar')) {
+                        url = 'https://api.perplexity.ai/chat/completions';
+                    }
+
+                    headers['Authorization'] = `Bearer ${key}`;
+                    body = JSON.stringify({ 
+                        model: model === 'custom' ? 'default' : model, 
+                        messages: [{ role: 'user', content: testPrompt }] 
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Anthropic and OpenAI often nest messages, while Gemini sometimes uses top-level error objects.
+                    const errorMessage = errorData.error?.message || errorData.error || errorData.message || response.statusText;
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                
+                let success = false, message = "";
+                if (model.startsWith('gemini')) { success = !!data.candidates; message = success ? data.candidates[0].content.parts[0].text : data.error?.message; }
+                else if (model.startsWith('claude')) { success = !!data.content; message = success ? data.content[0].text : "Unexpected response format"; }
+                else { success = !!data.choices; message = success ? data.choices[0].message.content : "Unexpected response format"; }
+
+                if (success) {
+                    alert(`AI Connection Successful (${model}): ` + message);
+                } else {
+                    alert("AI Error: " + (message || "Invalid Response"));
+                }
+            } catch (e) {
+                alert("Connection failed: " + e.message);
+            }
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        function saveSettings() {
+            CONFIG.GOOGLE_WEBHOOK_URL = document.getElementById('setting-webhook').value.trim();
+            CONFIG.AI_API_KEY = document.getElementById('setting-ai-key').value.trim();
+            CONFIG.AI_MODEL = document.getElementById('setting-ai-model').value;
+            CONFIG.AI_INSTRUCTIONS = document.getElementById('setting-ai-instructions').value.trim();
+            CONFIG.AI_BASE_URL = document.getElementById('setting-ai-base-url').value.trim();
+            CONFIG.AI_TEMPERATURE = parseFloat(document.getElementById('setting-ai-temp').value);
+            CONFIG.AI_MAX_TOKENS = parseInt(document.getElementById('setting-ai-tokens').value) || 2048;
+            
+            localStorage.setItem('invoiceSettings', JSON.stringify({
+                webhook: CONFIG.GOOGLE_WEBHOOK_URL,
+                aiKey: CONFIG.AI_API_KEY,
+                aiModel: CONFIG.AI_MODEL,
+                aiInstructions: CONFIG.AI_INSTRUCTIONS,
+                aiBaseUrl: CONFIG.AI_BASE_URL,
+                aiTemp: CONFIG.AI_TEMPERATURE,
+                aiTokens: CONFIG.AI_MAX_TOKENS
+            }));
+            
+            updateActiveModelDisplay();
+            closeSettings();
+            const indicator = document.getElementById('save-indicator');
+            indicator.textContent = "✔ Settings Saved";
+            indicator.classList.add('visible');
+            setTimeout(() => {
+                indicator.classList.remove('visible');
+                indicator.textContent = "✔ Saved to Browser";
+            }, 2000);
+        }
+
+        function updateActiveModelDisplay() {
+            const displayEl = document.getElementById('active-model-display');
+            if (displayEl) {
+                displayEl.textContent = CONFIG.AI_MODEL ? `Active: ${CONFIG.AI_MODEL}` : '';
+            }
+        }
+
+        function loadInvoiceData() {
+            // Load user settings first
+            const savedSettings = localStorage.getItem('invoiceSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                CONFIG.GOOGLE_WEBHOOK_URL = settings.webhook || '';
+                CONFIG.AI_API_KEY = settings.aiKey || '';
+                CONFIG.AI_MODEL = settings.aiModel || 'gemini-1.5-flash';
+                CONFIG.AI_INSTRUCTIONS = settings.aiInstructions || '';
+                CONFIG.AI_BASE_URL = settings.aiBaseUrl || '';
+                CONFIG.AI_TEMPERATURE = settings.aiTemp || 0.7;
+                CONFIG.AI_MAX_TOKENS = settings.aiTokens || 2048;
+            }
+
+            updateActiveModelDisplay();
+
+            const savedData = localStorage.getItem('invoiceData');
+            if (savedData) applyInvoiceState(JSON.parse(savedData));
+        }
+
+        // Name anonymization — maps real names to short codes
+        let NAME_CODES = JSON.parse(localStorage.getItem('invoiceNameCodes')) || {};
+
+        function getCode(name, type) {
+            if (!name) return '';
+            const key = `${type}_${name}`;
+            if (!NAME_CODES[key]) {
+                const prefix = type === 'client' ? 'C' : 'I';
+                const num = Object.keys(NAME_CODES).filter(k => k.startsWith(prefix)).length + 1;
+                NAME_CODES[key] = `${prefix}${String(num).padStart(3, '0')}`;
+                saveNameCodes();
+            }
+            return NAME_CODES[key];
+        }
+
+        function saveNameCodes() {
+            localStorage.setItem('invoiceNameCodes', JSON.stringify(NAME_CODES));
+        }
+
+        function renderNameCodesList() {
+            const container = document.getElementById('name-codes-list');
+            if (!container) return;
+            container.innerHTML = '';
+            Object.entries(NAME_CODES).forEach(([key, code]) => {
+                const [type, name] = key.split('_').rest ? [key.split('_')[0], key.split('_').slice(1).join('_')] : [key.split('_')[0], key.split('_')[1]];
+                const row = document.createElement('div');
+                row.style.cssText = 'display: flex; gap: 8px; padding: 6px; border-bottom: 1px solid #eee; align-items: center;';
+                row.innerHTML = `
+                    <span style="flex: 1; font-weight: bold; color: #333;">${code}</span>
+                    <span style="flex: 2; color: #666; font-size: 12px;">${name}</span>
+                    <button onclick="removeNameCode('${key}')" style="padding: 2px 6px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 3px;">✕</button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function addNameCodeRow() {
+            const name = prompt("Enter name to anonymize:");
+            if (!name) return;
+            const type = confirm("Is this a Client? (OK = Yes, Cancel = Investigator)") ? 'client' : 'investigator';
+            const existingKey = `${type}_${name}`;
+            if (NAME_CODES[existingKey]) {
+                alert("This name already has code: " + NAME_CODES[existingKey]);
+                return;
+            }
+            getCode(name, type); // auto-generates
+            renderNameCodesList();
+        }
+
+        function removeNameCode(key) {
+            delete NAME_CODES[key];
+            saveNameCodes();
+            renderNameCodesList();
+        }
+
+        // Call on Settings open and on page load to populate list
+        function initNameCodesTab() {
+            renderNameCodesList();
+        }
+
+        // Update handleDataImport to apply name codes for TLI format
+        // Inside the TLI block, replace investigator name and client name with codes
+        let confirmResolve = null;
+        function showConfirmModal(message) {
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+                document.getElementById('confirm-message').textContent = message;
+                document.getElementById('confirm-modal').style.display = 'flex';
+            });
+        }
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            if (confirmResolve) confirmResolve(false);
+            confirmResolve = null;
+        }
+        function confirmYes() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            if (confirmResolve) confirmResolve(true);
+            confirmResolve = null;
+        }
+
+        function exportToJson() {
+            const invoiceState = getInvoiceState();
+
+            const dataStr = JSON.stringify(invoiceState, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const pae = document.getElementById('field-pae').textContent.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            link.download = `invoice_backup_${pae || 'data'}.json`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function resetForm() {
+            if (!confirm("Are you sure you want to clear all data? This will wipe the memory and the screen.")) return;
+            document.querySelectorAll('tbody').forEach(tb => tb.innerHTML = '');
+            localStorage.removeItem('invoiceData');
+            window.location.reload();
+        }
+
+        function normalizeCategory(cat) {
+            if (!cat) return "";
+            const c = cat.toLowerCase();
+            if (c.includes('mileage')) return 'mileage';
+            if (c.includes('investigator service')) return 'hours';
+            if (c.includes('out of pocket')) return 'expenses';
+            return 'hours';
+        }
+
+        function handleDataImport(rawText) {
+            if (!rawText || !rawText.trim()) return;
+            
+            // Try to extract header info first (e.g. if the whole form was pasted)
+            extractHeaderInfo(rawText);
+
+            // Split on newline, keep empty lines for index alignment
+            const lines = rawText.split('\n');
+            let importCount = 0;
+            let firstInvestigator = null; // Capture from TLI rows
+
+            lines.forEach((line, index) => {
+                if (!line.trim()) return;
+                // Detect and skip TLI Log header if present
+                if (line.includes("Logged At") && line.includes("Tenths of Hours")) return;
+
+                let cols = line.split('\t'); // Google Sheets/Excel default
+                if (cols.length < 2) cols = line.split(',');
+                
+                if (cols.length < 2) return;
+
+                // Pad or trim cols to expected lengths for each format
+                const isLegacyHours = cols.length === 5;
+                const isLegacyMileage = cols.length === 4;
+                const isLegacyExpenses = cols.length === 6;
+                const isTLI = cols.length >= 12; // Accept TLI-like rows (pad to 16)
+
+                if (isTLI) {
+                    // Pad missing trailing columns (empty cells collapse on split)
+                    while (cols.length < 16) cols.push('');
+                    const caseNumber = cols[1].trim() || "Unspecified";
+                    const date = cols[5].trim();
+                    const category = cols[4].trim();
+                    const investigator = cols[14] ? cols[14].trim() : '';
+                    // Capture first investigator encountered
+                    if (investigator && !firstInvestigator) {
+                        firstInvestigator = investigator;
+                    }
+                    const hours = parseFloat(cols[8]) || 0;
+                    const qty = parseFloat(cols[10]) || 0;
+                    const miles = parseFloat(cols[11]) || 0;
+                    const description = cols[15] ? cols[15].trim() : '';
+                    let route = `${cols[12].trim()} → ${cols[13].trim()}`;
+                    if (investigator) {
+                        route += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Driver: ${investigator})`;
+                    }
+
+                    const type = normalizeCategory(category);
+
+                    if (hours > 0 || (type === 'hours' && qty > 0)) {
+                        const tbody = document.getElementById('table-hours').querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 4);
+                        const displayHours = hours > 0 ? hours : qty;
+                        const cleanedCategory = category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                            .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
+                            .replace(/witness development & interviews/gi, 'Witness Interviews')
+                            .replace(/case intake & file audit/gi, 'Case Intake and Audit')
+                            .trim();
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
+                        importCount++;
+                    }
+                    if (miles > 0) {
+                        const tbody = document.getElementById('table-mileage').querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 3);
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
+                        importCount++;
+                    }
+                    if (type === 'expenses' || (qty > 0 && hours === 0 && miles === 0)) {
+                        const tbody = document.getElementById('table-expenses').querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 5);
+                        
+                        let amount = 0;
+                        const catLower = category.toLowerCase();
+                        if (catLower.includes('photocopy') || catLower.includes('copies')) {
+                            const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                            amount = qty * rate;
+                        }
+
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim()}</td><td contenteditable="true">${description}</td><td contenteditable="true">${qty}</td><td class="amount-col" contenteditable="true">$${amount.toFixed(2)}</td></tr>`);
+                        importCount++;
+                    }
+                } else {
+                    // Legacy chunk-paste logic
+                    const caseNumber = cols[0].trim();
+                    if (!caseNumber) return;
+
+                    let targetTableId = '';
+                    let rowHtml = '';
+                    let colSpanData = 0;
+
+                    if (cols.length === 5) { // Hours: [Case, Date, Category, Description, Hours]
+                        targetTableId = 'table-hours';
+                        const cleanedCategory = cols[3].replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                            .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
+                            .replace(/witness development & interviews/gi, 'Witness Interviews')
+                            .replace(/case intake & file audit/gi, 'Case Intake and Audit')
+                            .trim();
+                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedCategory}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
+                        colSpanData = 4;
+                        importCount++;
+                    } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
+                        targetTableId = 'table-mileage';
+                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
+                        colSpanData = 3;
+                        importCount++;
+                    } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amt]
+                        targetTableId = 'table-expenses';
+                        const cleanedCategory = cols[2].replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim();
+                        
+                        let amt = cols[5];
+                        const catLower = cols[2].toLowerCase();
+                        if (amt.includes('0.00') && (catLower.includes('photocopy') || catLower.includes('copies'))) {
+                             const qty = parseFloat(cols[4]) || 0;
+                             const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                             amt = '$' + (qty * rate).toFixed(2);
+                        }
+
+                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
+                        colSpanData = 5;
+                        importCount++;
+                    }
+
+                    if (targetTableId) {
+                        const tbody = document.getElementById(targetTableId).querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, colSpanData);
+                        subtotalRow.insertAdjacentHTML('beforebegin', rowHtml);
+                    }
+                }
+            });
+
+            // Set investigator from paste if not already filled
+            if (firstInvestigator) {
+                const invField = document.getElementById('field-investigator');
+                if (invField && (invField.textContent.trim() === '' || invField.textContent.includes('enter'))) {
+                    invField.textContent = firstInvestigator;
+                }
+            }
+
+            // Default invoice date to today if still empty
+            const invDateField = document.getElementById('field-invoice-date');
+            if (invDateField) {
+                const current = invDateField.textContent.trim();
+                if (!current || current.includes('enter')) {
+                    const today = new Date();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const yyyy = today.getFullYear();
+                    invDateField.textContent = `${mm}/${dd}/${yyyy}`;
+                }
+            }
+
+            if (importCount > 0) {
+                updateInvoiceTotals();
+                saveInvoiceData();
+                document.getElementById('paste-area').value = ''; 
+                const indicator = document.getElementById('save-indicator');
+                indicator.textContent = `✔ Imported ${importCount} items`;
+                indicator.classList.add('visible');
+                setTimeout(() => indicator.classList.remove('visible'), 3000);
+            }
+        }
+
+        async function handlePdfFile(file) {
+            try {
+                // Clear previous PAE-related fields
+                const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae'];
+                paeFields.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '';
+                });
+
+                // Clear all invoice table rows to start fresh
+                document.querySelectorAll('table tbody').forEach(tbody => tbody.innerHTML = '');
+
+                // Show a loading indicator here if desired
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdf = await loadingTask.promise;
+                let fullText = "";
+                for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                }
+                if (extractHeaderInfo(fullText)) {
+                    updateInvoiceTotals();
+                    saveInvoiceData();
+                }
+            } catch (error) { console.error('PDF Scan Error:', error); }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Load the data from storage first
+            loadInvoiceData();
+            
+            // 2. Only calculate totals once the DOM has been populated
+            // This prevents a blank "auto-save" from overwriting your data
+            updateInvoiceTotals();
+
+            const pasteArea = document.getElementById('paste-area');
+            
+            // Use the specific paste event which is more reliable for large spreadsheet data
+            pasteArea.addEventListener('paste', async (e) => {
+                const text = (e.clipboardData || window.clipboardData).getData('Text');
+                if (text) {
+                    // If invoice already has data, ask before adding more
+                    if (document.querySelectorAll('.case-header').length > 0) {
+                        const confirmed = await showConfirmModal("Invoice already contains data. Add these new entries to the existing invoice?");
+                        if (!confirmed) {
+                            pasteArea.value = '';
+                            return;
+                        }
+                    }
+                    setTimeout(() => handleDataImport(text), 50);
+                }
+            });
+
+            // Drag and Drop support
+            pasteArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                pasteArea.style.borderColor = '#0066cc';
+            });
+            pasteArea.addEventListener('dragleave', () => pasteArea.style.borderColor = '#ddd');
+            pasteArea.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+                
+                // Always clear paste area on drop
+                pasteArea.value = '';
+                
+                if (file.type === "application/pdf" || file.name.toLowerCase().endsWith('.pdf')) {
+                    // PAE drop: ask to replace entire invoice
+                    const confirmed = await showConfirmModal("Replace current invoice with this PAE? All existing entries will be cleared.");
+                    if (!confirmed) return;
+                    handlePdfFile(file);
+                } else {
+                    // Data paste/drop: ask to add to existing (if any rows exist)
+                    if (document.querySelectorAll('.case-header').length > 0) {
+                        const confirmed = await showConfirmModal("Invoice already contains data. Add these new entries to the existing invoice?");
+                        if (!confirmed) return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => handleDataImport(ev.target.result.replace(/,/g, '\t'));
+                    reader.readAsText(file);
+                }
+            });
+
+            document.getElementById('pdf-input').addEventListener('change', (e) => {
+                if (e.target.files[0]) handlePdfFile(e.target.files[0]);
+            });
+
+            document.getElementById('json-input').addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const text = await file.text();
+                    applyInvoiceState(JSON.parse(text));
+                    saveInvoiceData();
+                    e.target.value = ''; // Reset input
+                }
+            });
+
+            // Use Event Delegation for all inputs and contenteditables
+            // This ensures dynamically added rows still trigger saves
+            document.body.addEventListener('input', (e) => {
+                if (e.target.matches('input, [contenteditable="true"]')) {
+                    updateInvoiceTotals();
+                }
+            });
+
+            document.body.addEventListener('blur', (e) => {
+                if (e.target.matches('td[contenteditable="true"]')) {
+                    updateInvoiceTotals();
+                }
+            }, true); // Use capture phase for blur as it doesn't bubble
+        });
+    </script>
+</body>
+</html>
