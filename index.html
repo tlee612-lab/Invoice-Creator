@@ -88,7 +88,30 @@
             #import-zone, #ai-results, .modal-overlay { display: none !important; } 
             body { padding: 0; background: white; } 
             .invoice-container { box-shadow: none; padding: 0; background: white; color: black; }
-            .vendor-info { white-space: nowrap; }
+            .header { border-bottom-color: black; }
+            .vendor-info { 
+                color: black !important;
+                font-size: 11px;
+            }
+            .vendor-info * { color: black !important; }
+            .pae-dates-flex {
+                flex-wrap: nowrap !important;
+                gap: 8px !important;
+            }
+            .pae-dates-flex div {
+                white-space: nowrap;
+            }
+            table { border-color: black; }
+            .hours-col, .miles-col, .amount-col { border-color: black; }
+            .subtotal { border-top: 2px solid black; }
+            .invoice-totals-table td { border-color: black; }
+        }
+            .vendor-info span { color: black !important; }
+            .vendor-info strong { color: black !important; }
+            table { border-color: black; }
+            .hours-col, .miles-col, .amount-col { border-color: black; }
+            .subtotal { border-top: 2px solid black; }
+            .invoice-totals-table td { border-color: black; }
         }
 
         .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); gap: 20px; }
@@ -345,7 +368,7 @@
                 <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <div style="display: flex; gap: 16px; margin-top: 4px;">
+                <div style="display: flex; gap: 16px; margin-top: 4px;" class="pae-dates-flex">
                     <div><strong>PAE Eff:</strong> <span id="field-pae-effective" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span></div>
                     <div><strong>PAE Exp:</strong> <span id="field-pae-expiration" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span></div>
                 </div>
