@@ -144,7 +144,7 @@
             <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
             <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
             <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
-            <button onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Convert Names</button>
+            <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Convert Names</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="display:none">
             <input type="file" id="json-input" accept=".json" style="display:none">
@@ -1193,17 +1193,33 @@
 
         function updateAIButtonState() {
             const btn = document.getElementById('btn-ai');
-            if (!btn) return;
-            const hasKey = CONFIG.AI_API_KEY && CONFIG.AI_API_KEY.trim().length > 0;
-            const hasModel = CONFIG.AI_MODEL && CONFIG.AI_MODEL.trim().length > 0;
-            const enabled = hasKey && hasModel;
-            btn.disabled = !enabled;
-            btn.style.opacity = enabled ? '1' : '0.5';
-            btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
-            if (!enabled) {
-                btn.title = 'Configure AI API key and model in Settings (⚙️) to enable';
-            } else {
-                btn.title = 'AI analysis of invoice';
+            if (btn) {
+                const hasKey = CONFIG.AI_API_KEY && CONFIG.AI_API_KEY.trim().length > 0;
+                const hasModel = CONFIG.AI_MODEL && CONFIG.AI_MODEL.trim().length > 0;
+                const enabled = hasKey && hasModel;
+                btn.disabled = !enabled;
+                btn.style.opacity = enabled ? '1' : '0.5';
+                btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+                if (!enabled) {
+                    btn.title = 'Configure AI API key and model in Settings (⚙️) to enable';
+                } else {
+                    btn.title = 'AI analysis of invoice';
+                }
+            }
+            // Also update Convert Names button
+            const convertBtn = document.getElementById('btn-convert-names');
+            if (convertBtn) {
+                const hasKey = CONFIG.AI_API_KEY && CONFIG.AI_API_KEY.trim().length > 0;
+                const hasModel = CONFIG.AI_MODEL && CONFIG.AI_MODEL.trim().length > 0;
+                const enabled = hasKey && hasModel;
+                convertBtn.disabled = !enabled;
+                convertBtn.style.opacity = enabled ? '1' : '0.5';
+                convertBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+                if (!enabled) {
+                    convertBtn.title = 'Configure AI API key and model in Settings (⚙️) to enable';
+                } else {
+                    convertBtn.title = 'Convert names to anonymized codes';
+                }
             }
         }
 
