@@ -1422,26 +1422,46 @@
             });
 
             document.getElementById('applyNameLabels').onclick = () => {
-                // Read selections and numbers
+                // Read selections and custom numbers
                 assignments.forEach((item, idx) => {
                     const sel = modal.querySelector(`select[data-idx="${idx}"]`);
                     const numInput = modal.querySelector(`input[data-idx="${idx}"]`);
                     item.label = sel.value;
-                    item.customNum = numInput ? parseInt(numInput.value) : null;
+                    item.customNum = numInput ? (parseInt(numInput.value) || null) : null;
                 });
                 overlay.remove();
 
-                // Apply replacements
+                // Determine final numbers (use custom if provided, else auto-increment)
                 const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
-                assignments.forEach(({ name, label, customNum }) => {
-                    if (label === 'skip') return;
-                    let finalNum;
-                    if (customNum && customNum > 0) {
-                        finalNum = customNum;
+                assignments.forEach(item => {
+                    if (item.label === 'skip') return;
+                    if (item.customNum && item.customNum > 0) {
+                        item.finalNum = item.customNum;
                     } else {
-                        counters[label] += 1;
-                        finalNum = counters[label];
+                        counters[item.label] += 1;
+                        item.finalNum = counters[item.label];
                     }
+                });
+
+                // Validate: ensure same (label, number) not given to two different names in same case
+                const used = {}; // caseNum -> Map<"label|num", name>
+                for (const { name, label, finalNum, cases } of assignments) {
+                    if (label === 'skip') continue;
+                    const key = `${label}|${finalNum}`;
+                    for (const caseNum of cases) {
+                        if (!used[caseNum]) used[caseNum] = new Map();
+                        const existing = used[caseNum].get(key);
+                        if (existing && existing !== name) {
+                            alert(`⚠️ Conflict: ${label} ${finalNum} is already assigned to "${existing}" in case ${caseNum}. Cannot assign to "${name}".\n\nPlease change the number for "${name}" or use a different label.`);
+                            return; // abort apply
+                        }
+                        used[caseNum].set(key, name);
+                    }
+                }
+
+                // Apply replacements
+                assignments.forEach(({ name, label, finalNum }) => {
+                    if (label === 'skip') return;
                     const replacement = `${label.charAt(0).toUpperCase() + label.slice(1)} ${finalNum}`;
                     rows.forEach(({ element }) => {
                         element.textContent = element.textContent.replace(name, replacement);
