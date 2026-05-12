@@ -723,10 +723,10 @@
             totalRows[1].cells[5].textContent = '$' + (totalHours59 * CONFIG.RATE_LATE).toFixed(2);
 
             totalRows[2].cells[3].textContent = totalMiles2025.toFixed(1) + ' mi';
-            totalRows[2].cells[5].textContent = '$' + (totalMiles2025 * CONFIG.MILEAGE_2025).toFixed(2);
+            totalRows[2].cells[5].textContent = '$' + (Math.round(totalMiles2025 * CONFIG.MILEAGE_2025 * 100) / 100).toFixed(2);
 
             totalRows[3].cells[3].textContent = totalMiles2026.toFixed(1) + ' mi';
-            totalRows[3].cells[5].textContent = '$' + (totalMiles2026 * CONFIG.MILEAGE_2026).toFixed(2);
+            totalRows[3].cells[5].textContent = '$' + (Math.round(totalMiles2026 * CONFIG.MILEAGE_2026 * 100) / 100).toFixed(2);
 
             totalRows[4].cells[2].textContent = 'Out of Pocket Expenses';
             totalRows[4].cells[5].textContent = '$' + totalExpenses.toFixed(2);
