@@ -145,6 +145,7 @@
             <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
             <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
             <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Convert Names</button>
+            <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">✅ Validate</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="display:none">
             <input type="file" id="json-input" accept=".json" style="display:none">
@@ -330,7 +331,6 @@
                 <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since pae was produced</div>
             </div>
-            <button id="btn-validate" onclick="analyzeInvoiceAI()" title="Validate invoice with AI analysis" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: auto; white-space: nowrap; margin-left: 10px;">Validate</button>
         </div>
         <div class="top-section">
             <div class="client-section">
@@ -916,6 +916,125 @@
                 resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
             } catch (error) {
                 console.error("AI Error:", error);
+                resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            }
+
+            // Validation: check for errors, missing fields, rate mistakes, duplicates, etc.
+        }
+
+        async function validateInvoice() {
+            const btn = document.getElementById('btn-validate');
+            if (btn && btn.disabled) {
+                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
+                return;
+            }
+            if (!CONFIG.AI_API_KEY) {
+                alert("Please configure the AI API Key in Settings (⚙️).");
+                return;
+            }
+            if (!CONFIG.AI_MODEL) {
+                alert("Please select an AI model in Settings (⚙️).");
+                return;
+            }
+
+            const apiKey = CONFIG.AI_API_KEY.trim();
+
+            const state = getInvoiceState();
+            const resultsDiv = document.getElementById('ai-results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<span class="ai-loading">Validating invoice... checking for errors and discrepancies...</span>';
+
+            const validationPrompt = `You are an invoice validation assistant for a legal investigation firm. Review the provided invoice data and produce a structured validation report.
+
+VALIDATION CHECKS:
+1. Rate Errors: Check each service hour entry. If date < Aug 1 2025, rate should be $55/hr. If date >= Aug 1 2025, rate should be $59/hr. Flag mismatches.
+2. Duplicate Entries: Flag rows with identical date, category, description, and hours.
+3. Required Fields Missing: Client, Case #, Attorney, PAE #, Investigator, Invoice #, Invoice Date must be filled (not placeholder).
+4. Date Logic: Invoice Date should be on or after the latest service date. If PAE info is present, service dates should not be before the PAE effective date.
+5. Totals Integrity: Compute grand total from all line items (hours, mileage, expenses). Compare to displayed TOTAL. Flag if different.
+6. Authorization Exceeded: If 'Auth Hours' is set, check if total hours billed > authorized. Flag overage.
+7. Mileage Plausibility: Flag any single mileage entry > 200 miles as potentially unusual.
+8. Copy Counts: B&W and Color copy quantities should be represented as line items in expenses; if missing quantities, flag.
+9. Empty Descriptions: Any service hour entry with blank or missing description should be flagged.
+
+OUTPUT FORMAT (exactly):
+=== VALIDATION REPORT ===
+[Section header like "RATE ERRORS" or "MISSING FIELDS"]
+• Bullet: brief description (include case #, date, or line reference)
+[Next section...]
+=== SUMMARY ===
+Total issues found: N
+Critical errors: N (e.g., overage, totals mismatch)
+Warnings: N
+
+If no issues: "No validation issues detected."`;
+
+            const prompt = `${validationPrompt}\n\nInvoice Data: ${JSON.stringify(state, null, 2)}`;
+
+            try {
+                const model = CONFIG.AI_MODEL;
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+                const temperature = CONFIG.AI_TEMPERATURE || 0.3;
+                const max_tokens = CONFIG.AI_MAX_TOKENS || 2048;
+                const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, '');
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    body = JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature, maxOutputTokens: max_tokens * 2 },
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ]
+                    });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = JSON.stringify({
+                        model,
+                        max_tokens: max_tokens * 2,
+                        temperature,
+                        system: validationPrompt,
+                        messages: [{ role: 'user', content: `Validate this invoice data:\n\n${JSON.stringify(state, null, 2)}` }]
+                    });
+                } else {
+                    const openAiBaseUrl = baseUrl || 'https://api.openai.com/v1';
+                    url = openAiBaseUrl + '/chat/completions';
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = JSON.stringify({
+                        model: model === 'custom' ? 'gpt-3.5-turbo' : model,
+                        messages: [
+                            { role: 'system', content: validationPrompt },
+                            { role: 'user', content: `Validate this invoice data:\n\n${JSON.stringify(state, null, 2)}` }
+                        ],
+                        temperature,
+                        max_tokens: max_tokens * 2
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    const errorMessage = errorData.error?.message || response.statusText;
+                    throw new Error(`${errorMessage}`);
+                }
+
+                const result = await response.json();
+
+                let aiText = '';
+                if (model.startsWith('gemini')) aiText = result.candidates[0].content.parts[0].text;
+                else if (model.startsWith('claude')) aiText = result.content[0].text;
+                else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content;
+
+                resultsDiv.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
+            } catch (error) {
+                console.error("Validation Error:", error);
                 resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
             }
         }
