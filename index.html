@@ -167,7 +167,7 @@
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
                     </div>
                     <div class="input-group">
-                        <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5;">
+                        <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border-radius: 4px; font-size: 13px;">
                             <optgroup label="Google Gemini">
                                 <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                                 <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
@@ -253,7 +253,7 @@
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
                     </div>
                     <div class="input-group">
-                        <textarea id="setting-ai-instructions" rows="3" readonly style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5; resize: vertical;"></textarea>
+                        <textarea id="setting-ai-instructions" rows="3" readonly style="flex: 1; padding: 10px; border-radius: 4px; font-size: 13px; resize: vertical;"></textarea>
                         <button class="btn-icon" id="lock-ai-instructions" onclick="toggleField('setting-ai-instructions', 'lock')" title="Unlock Field">🔒</button>
                     </div>
                 </div>
