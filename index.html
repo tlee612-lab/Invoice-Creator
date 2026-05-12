@@ -19,7 +19,7 @@
         /* App Controls */
         #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: #2d2d2d; padding: 20px; border-radius: 8px; border: 2px dashed #0066cc; }
         #import-zone h3 { margin-bottom: 2px; font-size: 16px; color: #0066cc; }
-        #active-model-display { font-size: 12px; color: #88aaff; font-weight: bold; margin-right: 8px; }
+        #active-model-display { font-size: 12px; color: #66ccff; font-weight: bold; margin-right: 8px; text-shadow: 0 0 3px rgba(0,102,204,0.4); }
         #paste-area { width: 100%; height: 80px; padding: 10px; border: 1px solid #555; border-radius: 4px; resize: vertical; font-size: 13px; background: #1e1e1e; color: #e0e0e0; }
         .instructions { font-size: 11px; color: #aaa; margin-top: 5px; }
         #ai-results { margin-top: 15px; padding: 12px; background: #252525; border-left: 4px solid #0066cc; border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: #e0e0e0; }
@@ -29,18 +29,22 @@
         .modal-content { background: #2d2d2d; padding: 30px; border-radius: 8px; width: 600px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: #e0e0e0; }
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #0066cc; display: flex; justify-content: space-between; align-items: center; }
         .modal-tabs { display: flex; border-bottom: 1px solid #555; margin-bottom: 15px; }
-        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: bold; color: #aaa; transition: all 0.2s; }
-        .modal-tab:hover { color: #0066cc; }
-        .modal-tab.active { color: #0066cc; border-bottom-color: #0066cc; }
+        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: #aaa; transition: all 0.2s; }
+        .modal-tab:hover { color: #fff; }
+        .modal-tab.active { color: #fff; border-bottom-color: #0066cc; font-weight: 700; }
         .tab-content { display: none; min-height: 120px; }
         .tab-content.active { display: block; }
         .settings-field { margin-bottom: 20px; }
         .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: #e0e0e0; font-weight: bold; }
         .input-group { display: flex; gap: 5px; }
-        .settings-field input { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #1e1e1e; color: #e0e0e0; }
-        .settings-field input:read-only { background: #252525; color: #aaa; cursor: not-allowed; }
-        .settings-field select { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #1e1e1e; color: #e0e0e0; }
-        .settings-field textarea { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #1e1e1e; color: #e0e0e0; resize: vertical; }
+        .settings-field input { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #222; color: #f0f0f0; font-weight: 500; }
+        .settings-field input:read-only { background: #2a2a2a; color: #ccc; cursor: not-allowed; font-weight: 400; }
+        .settings-field input::placeholder { color: #777; }
+        .settings-field select { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #222; color: #f0f0f0; font-weight: 500; }
+        .settings-field select:disabled { background: #2a2a2a; color: #ccc; cursor: not-allowed; font-weight: 400; }
+        .settings-field textarea { flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; font-size: 14px; background: #222; color: #f0f0f0; font-weight: 500; resize: vertical; }
+        .settings-field textarea:read-only { background: #2a2a2a; color: #ccc; cursor: not-allowed; font-weight: 400; }
+        .settings-field textarea::placeholder { color: #777; }
         .btn-icon { background: #3d3d3d; border: 1px solid #555; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; color: #e0e0e0; }
         .btn-test { background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
         .btn-test:hover { background: #0052a3; }
