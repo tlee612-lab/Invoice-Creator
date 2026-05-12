@@ -1015,7 +1015,7 @@
                 else if (model.startsWith('claude')) aiText = result.content[0].text;
                 else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content; // Standard OpenAI format
 
-                resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
+                resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">⚠ Note: AI may make arithmetic errors. Please verify all calculations manually.</em>`;
             } catch (error) {
                 console.error("AI Error:", error);
                 resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
@@ -1164,7 +1164,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 else if (model.startsWith('claude')) aiText = result.content[0].text;
                 else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content;
 
-                contentEl.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
+                contentEl.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">⚠ Note: AI may make arithmetic errors. Please verify all calculations, especially totals, manually.</em>`;
             } catch (error) {
                 console.error("Validation Error:", error);
                 contentEl.innerHTML = `<strong>Error:</strong> ${error.message}`;
