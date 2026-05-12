@@ -897,7 +897,13 @@
                     url = 'https://api.anthropic.com/v1/messages';
                     headers['x-api-key'] = apiKey;
                     headers['anthropic-version'] = '2023-06-01';
-                    body = JSON.stringify({ model, max_tokens, temperature, messages: [{ role: 'user', content: prompt }] });
+                    body = JSON.stringify({
+                        model,
+                        max_tokens,
+                        temperature,
+                        system: systemPrompt,
+                        messages: [{ role: 'user', content: `Here is the invoice data to analyze:\n\n${JSON.stringify(state, null, 2)}` }]
+                    });
                 } else {
                     // OpenAI Compatible API (GPT, Grok, DeepSeek, Perplexity, Custom)
                     if (model === 'custom') {
