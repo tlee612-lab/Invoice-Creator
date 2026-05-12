@@ -144,9 +144,7 @@
             <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
             <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
             <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
-            <button onclick="sendToGoogleSheet()" title="Send invoice to Google Sheets" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">☁️ Send</button>
-            <button onclick="pullFromGoogleSheet()" title="Pull invoice from Google Sheets" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">⬇️ Pull</button>
-            <button onclick="analyzeInvoiceAI()" title="AI analysis of invoice" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
+            <button id="btn-ai" onclick="analyzeInvoiceAI()" title="AI analysis of invoice" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="display:none">
             <input type="file" id="json-input" accept=".json" style="display:none">
@@ -162,26 +160,13 @@
                 <span>App Settings</span>
                 <button class="btn-close" onclick="closeSettings()">&times;</button>
             </div>
+            <div id="settings-save-message" style="display: none; color: var(--accent); font-size: 12px; margin-bottom: 8px; font-weight: bold; text-align: center;">✔ Settings saved</div>
             
             <div class="modal-tabs">
-                <div class="modal-tab active" data-tab="webhook" onclick="switchTab('webhook')">Webhook Sync</div>
-                <div class="modal-tab" data-tab="ai" onclick="switchTab('ai')">AI Assistant</div>
+                <div class="modal-tab active" data-tab="ai" onclick="switchTab('ai')">AI Assistant</div>
             </div>
 
-            <div id="tab-webhook" class="tab-content active">
-                <div class="settings-field">
-                    <label>Google Sheets Webhook URL</label>
-                    <div class="input-group">
-                        <input type="password" id="setting-webhook" placeholder="not functional at this time" readonly>
-                        <button class="btn-icon" onclick="toggleField('setting-webhook', 'visibility')" title="Toggle Visibility">👁️</button>
-                        <button class="btn-icon" id="lock-webhook" onclick="toggleField('setting-webhook', 'lock')" title="Unlock Field">🔒</button>
-                        <button class="btn-test" onclick="testWebhook()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
-                    </div>
-                </div>
-                <div class="instructions" style="font-size: 10px;">Endpoint for syncing invoice data to Google Sheets.</div>
-            </div>
-
-            <div id="tab-ai" class="tab-content">
+            <div id="tab-ai" class="tab-content active">
                 <div class="settings-field">
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
                         <label style="margin-bottom: 0;">AI Provider & Model</label>
@@ -189,6 +174,7 @@
                     </div>
                     <div class="input-group">
                         <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border-radius: 4px; font-size: 13px;">
+                            <option value="" disabled selected>Select a provider...</option>
                             <optgroup label="Google Gemini">
                                 <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                                 <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
@@ -198,9 +184,9 @@
                                 <option value="gpt-4o-mini">GPT-4o Mini</option>
                             </optgroup>
                             <optgroup label="Anthropic Claude">
-                                <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
-                                <option value="claude-3-5-haiku-20240620">Claude 3.5 Haiku</option>
-                                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                                <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                                <option value="claude-3-5-haiku">Claude 3.5 Haiku</option>
+                                <option value="claude-3-opus">Claude 3 Opus</option>
                             </optgroup>
                             <optgroup label="xAI Grok">
                                 <option value="grok-beta">Grok Beta</option>
@@ -412,9 +398,8 @@
             MILEAGE_2026: 0.725,
             COPY_RATE_BW: 0.10,
             COPY_RATE_COLOR: 0.50,
-            GOOGLE_WEBHOOK_URL: '', // Add your Apps Script Web App URL here
-            AI_API_KEY: '', // Add your Gemini API Key here
-            AI_MODEL: 'gemini-1.5-flash',
+            AI_API_KEY: '',
+            AI_MODEL: '',
             AI_INSTRUCTIONS: '',
             AI_BASE_URL: '',
             AI_TEMPERATURE: 0.7,
@@ -771,7 +756,6 @@
 
         function saveInvoiceData() {
             const invoiceState = getInvoiceState();
-
             localStorage.setItem('invoiceData', JSON.stringify(invoiceState));
 
             // DATA PERSISTENCE GUARD:
@@ -789,76 +773,18 @@
             }
         }
 
-        async function sendToGoogleSheet() {
-            if (!CONFIG.GOOGLE_WEBHOOK_URL) {
-                alert("Please configure the GOOGLE_WEBHOOK_URL in the CONFIG script block.");
-                return;
-            }
-
-            const state = getInvoiceState();
-            state.app_source = "InvoiceCreator"; // Identifies the source for the shared webhook
-            const indicator = document.getElementById('save-indicator');
-            
-            try {
-                indicator.textContent = "⏳ Sending to Google Sheets...";
-                indicator.classList.add('visible');
-
-                const response = await fetch(CONFIG.GOOGLE_WEBHOOK_URL, {
-                    method: 'POST',
-                    mode: 'no-cors', // Essential for Google Apps Script Web Apps
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(state)
-                });
-
-                indicator.textContent = "✔ Successfully synced with Sheet";
-                setTimeout(() => {
-                    indicator.classList.remove('visible');
-                    indicator.textContent = "✔ Saved to Browser";
-                }, 3000);
-            } catch (error) {
-                console.error("Webhook Error:", error);
-                alert("Failed to send data to Google Sheets.");
-            }
-        }
-
-        async function pullFromGoogleSheet() {
-            if (!CONFIG.GOOGLE_WEBHOOK_URL) {
-                alert("Please configure the GOOGLE_WEBHOOK_URL in the Settings.");
-                return;
-            }
-
-            const indicator = document.getElementById('save-indicator');
-            try {
-                indicator.textContent = "⏳ Pulling from Google Sheets...";
-                indicator.classList.add('visible');
-
-                // Note: Google Apps Script usually requires a GET request to return data
-                // We can append a type parameter to help the script route the request
-                const response = await fetch(CONFIG.GOOGLE_WEBHOOK_URL + "?type=invoice");
-                if (!response.ok) throw new Error("Network response was not ok");
-                
-                const data = await response.json();
-                if (data) {
-                    // If the data is an array of logs, it might need translation
-                    // But here we assume it returns the same state object we sent
-                    applyInvoiceState(data);
-                    indicator.textContent = "✔ Data pulled successfully";
-                }
-            } catch (error) {
-                console.error("Pull Error:", error);
-                alert("Failed to pull data from Google Sheets. Ensure your script supports GET requests and CORS.");
-                indicator.textContent = "✖ Pull failed";
-            } finally {
-                setTimeout(() => {
-                    indicator.classList.remove('visible');
-                    indicator.textContent = "✔ Saved to Browser";
-                }, 3000);
-            }
-        }
-
         async function analyzeInvoiceAI() {
+            const btn = document.getElementById('btn-ai');
+            if (btn && btn.disabled) {
+                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
+                return;
+            }
             if (!CONFIG.AI_API_KEY) {
-                alert("Please configure the AI_API_KEY in the CONFIG script block.");
+                alert("Please configure the AI API Key in Settings (⚙️).");
+                return;
+            }
+            if (!CONFIG.AI_MODEL) {
+                alert("Please select an AI model in Settings (⚙️).");
                 return;
             }
 
@@ -894,7 +820,7 @@
                 } else if (model.startsWith('claude')) {
                     url = 'https://api.anthropic.com/v1/messages';
                     headers['x-api-key'] = apiKey;
-                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-version'] = '2024-01-01';
                     headers['anthropic-dangerous-direct-browser-access'] = 'true';
                     body = JSON.stringify({
                         model,
@@ -1016,7 +942,6 @@
         }
 
         function openSettings() {
-            document.getElementById('setting-webhook').value = CONFIG.GOOGLE_WEBHOOK_URL || '';
             document.getElementById('setting-ai-key').value = CONFIG.AI_API_KEY || '';
             
             const modelEl = document.getElementById('setting-ai-model');
@@ -1025,7 +950,7 @@
             const tempEl = document.getElementById('setting-ai-temp');
             const tokensEl = document.getElementById('setting-ai-tokens');
             
-            if (modelEl) modelEl.value = CONFIG.AI_MODEL || 'gemini-1.5-flash';
+            if (modelEl) modelEl.value = CONFIG.AI_MODEL || '';
             if (instrEl) instrEl.value = CONFIG.AI_INSTRUCTIONS || '';
             if (baseUrlEl) baseUrlEl.value = CONFIG.AI_BASE_URL || '';
             if (tempEl) {
@@ -1034,13 +959,13 @@
             }
             if (tokensEl) tokensEl.value = CONFIG.AI_MAX_TOKENS || 2048;
 
-            toggleBaseUrlField(modelEl.value);
+            toggleBaseUrlField(modelEl ? modelEl.value : '');
             
-            // Default to the first tab
-            switchTab('webhook');
+            // Default to the AI tab
+            switchTab('ai');
 
             // Ensure fields are locked when opening
-            ['setting-webhook', 'setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'].forEach(id => {
+            ['setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'].forEach(id => {
                 const input = document.getElementById(id);
                 if (!input) return;
                 
@@ -1053,7 +978,6 @@
                     input.disabled = true;
                 } else {
                     input.readOnly = true;
-                    if (id === 'setting-webhook' || id === 'setting-ai-key') input.type = 'password';
                 }
                 input.style.background = '#f5f5f5';
                 if (lockBtn) lockBtn.textContent = '🔒';
@@ -1072,7 +996,6 @@
                     input.type = input.type === 'password' ? 'text' : 'password';
                 }
             } else if (action === 'lock') {
-                // Detect if we should use disabled or readOnly based on element type
                 const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number';
                 const isLocked = useDisabled ? input.disabled : input.readOnly;
                 const newState = !isLocked;
@@ -1090,26 +1013,12 @@
             }
         }
 
-        async function testWebhook() {
-            const url = document.getElementById('setting-webhook').value.trim();
-            if (!url) return alert("Enter a URL first.");
-            
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ test: true, timestamp: new Date().toISOString() })
-                });
-                alert("Webhook test signal sent! (Check your Google Sheet for the test entry)");
-            } catch (e) {
-                alert("Test failed: " + e.message);
-            }
-        }
-
         async function testAI() {
             const key = document.getElementById('setting-ai-key').value.trim();
             const model = document.getElementById('setting-ai-model').value;
+            console.log('Test AI - Model selected:', `"${model}"`); // DEBUG
             if (!key) return alert("Enter an API key first.");
+            if (!model) return alert("Select an AI model first.");
 
             try {
                 let url, headers = { 'Content-Type': 'application/json' }, body;
@@ -1122,12 +1031,13 @@
                 } else if (model.startsWith('claude')) {
                     url = 'https://api.anthropic.com/v1/messages';
                     headers['x-api-key'] = key;
-                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-version'] = '2024-01-01';
                     headers['anthropic-dangerous-direct-browser-access'] = 'true';
                     body = JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: testPrompt }] });
-                } else {
+                } else if (model.startsWith('gpt') || model.startsWith('grok') || model.startsWith('deepseek') || model.includes('sonar') || model === 'custom') {
                     // OpenAI Compatible
                     if (model === 'custom') {
+                        if (!baseUrl) throw new Error("Custom endpoint selected but API Base URL is empty.");
                         url = baseUrl.replace(/\/$/, '') + '/chat/completions';
                     } else if (model.startsWith('gpt')) {
                         url = 'https://api.openai.com/v1/chat/completions';
@@ -1144,6 +1054,8 @@
                         model: model === 'custom' ? 'default' : model, 
                         messages: [{ role: 'user', content: testPrompt }] 
                     });
+                } else {
+                    throw new Error(`Unsupported model: ${model}`);
                 }
 
                 const response = await fetch(url, { method: 'POST', headers, body });
@@ -1177,7 +1089,6 @@
         }
 
         function saveSettings() {
-            CONFIG.GOOGLE_WEBHOOK_URL = document.getElementById('setting-webhook').value.trim();
             CONFIG.AI_API_KEY = document.getElementById('setting-ai-key').value.trim();
             CONFIG.AI_MODEL = document.getElementById('setting-ai-model').value;
             CONFIG.AI_INSTRUCTIONS = document.getElementById('setting-ai-instructions').value.trim();
@@ -1186,7 +1097,6 @@
             CONFIG.AI_MAX_TOKENS = parseInt(document.getElementById('setting-ai-tokens').value) || 2048;
             
             localStorage.setItem('invoiceSettings', JSON.stringify({
-                webhook: CONFIG.GOOGLE_WEBHOOK_URL,
                 aiKey: CONFIG.AI_API_KEY,
                 aiModel: CONFIG.AI_MODEL,
                 aiInstructions: CONFIG.AI_INSTRUCTIONS,
@@ -1196,20 +1106,38 @@
             }));
             
             updateActiveModelDisplay();
-            closeSettings();
-            const indicator = document.getElementById('save-indicator');
-            indicator.textContent = "✔ Settings Saved";
-            indicator.classList.add('visible');
-            setTimeout(() => {
-                indicator.classList.remove('visible');
-                indicator.textContent = "✔ Saved to Browser";
-            }, 2000);
+            updateAIButtonState();
+
+            // Show confirmation without closing modal
+            const saveMsg = document.getElementById('settings-save-message');
+            if (saveMsg) {
+                saveMsg.style.display = 'block';
+                saveMsg.textContent = '✔ Settings saved';
+                setTimeout(() => { saveMsg.style.display = 'none'; }, 2000);
+            }
         }
 
         function updateActiveModelDisplay() {
             const displayEl = document.getElementById('active-model-display');
             if (displayEl) {
                 displayEl.textContent = CONFIG.AI_MODEL ? `Active: ${CONFIG.AI_MODEL}` : '';
+            }
+            updateAIButtonState();
+        }
+
+        function updateAIButtonState() {
+            const btn = document.getElementById('btn-ai');
+            if (!btn) return;
+            const hasKey = CONFIG.AI_API_KEY && CONFIG.AI_API_KEY.trim().length > 0;
+            const hasModel = CONFIG.AI_MODEL && CONFIG.AI_MODEL.trim().length > 0;
+            const enabled = hasKey && hasModel;
+            btn.disabled = !enabled;
+            btn.style.opacity = enabled ? '1' : '0.5';
+            btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+            if (!enabled) {
+                btn.title = 'Configure AI API key and model in Settings (⚙️) to enable';
+            } else {
+                btn.title = 'AI analysis of invoice';
             }
         }
 
@@ -1218,9 +1146,8 @@
             const savedSettings = localStorage.getItem('invoiceSettings');
             if (savedSettings) {
                 const settings = JSON.parse(savedSettings);
-                CONFIG.GOOGLE_WEBHOOK_URL = settings.webhook || '';
                 CONFIG.AI_API_KEY = settings.aiKey || '';
-                CONFIG.AI_MODEL = settings.aiModel || 'gemini-1.5-flash';
+                CONFIG.AI_MODEL = settings.aiModel || '';
                 CONFIG.AI_INSTRUCTIONS = settings.aiInstructions || '';
                 CONFIG.AI_BASE_URL = settings.aiBaseUrl || '';
                 CONFIG.AI_TEMPERATURE = settings.aiTemp || 0.7;
@@ -1228,6 +1155,7 @@
             }
 
             updateActiveModelDisplay();
+            updateAIButtonState();
 
             const savedData = localStorage.getItem('invoiceData');
             if (savedData) applyInvoiceState(JSON.parse(savedData));
