@@ -1485,6 +1485,26 @@ function updateInvoiceTotals() {
             } catch (error) { console.error('PDF Scan Error:', error); }
         }
 
+        function invoiceHasData() {
+            // Check header fields for non-placeholder content
+            const headerIds = [
+                'field-client', 'field-case', 'field-attorney', 'field-pae',
+                'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range'
+            ];
+            for (const id of headerIds) {
+                const el = document.getElementById(id);
+                if (el) {
+                    const txt = el.textContent.trim();
+                    if (txt && !txt.includes('enter') && !txt.includes('Drop') && !txt.includes('click here')) {
+                        return true;
+                    }
+                }
+            }
+            // Check if any line items exist in tables
+            if (document.querySelectorAll('.case-header').length > 0) return true;
+            return false;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Load the data from storage first
             loadInvoiceData();
@@ -1526,9 +1546,11 @@ function updateInvoiceTotals() {
                 pasteArea.value = '';
                 
                 if (file.type === "application/pdf" || file.name.toLowerCase().endsWith('.pdf')) {
-                    // PAE drop: ask to replace entire invoice
-                    const confirmed = await showConfirmModal("Replace current invoice with this PAE? All existing entries will be cleared.");
-                    if (!confirmed) return;
+                    // PAE drop: only ask to replace if invoice already has meaningful data
+                    if (invoiceHasData()) {
+                        const confirmed = await showConfirmModal("Replace current invoice with this PAE? All existing entries will be cleared.");
+                        if (!confirmed) return;
+                    }
                     handlePdfFile(file);
                 } else {
                     // Data paste/drop: ask to add to existing (if any rows exist)
