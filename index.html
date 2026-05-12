@@ -1963,6 +1963,13 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
         function handleDataImport(rawText) {
             if (!rawText || !rawText.trim()) return;
 
+            // Require TLI header for proper column mapping
+            const hasTLIHeader = rawText.includes("Logged At") && rawText.includes("Tenths of Hours");
+            if (!hasTLIHeader) {
+                alert("Invalid paste format. Please paste the full TLI export including the header row with column names:\nLogged At\tCase Number\tClient Last Name\tClient First Name\tActivity Type\tDate\tTime\tDuration (mins)\tTenths of Hours\t...");
+                return;
+            }
+
             // Split on newline, keep empty lines for index alignment
             const lines = rawText.split('\n');
             let importCount = 0;
@@ -2369,6 +2376,19 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                     tempHelpPopup.style.display = 'none';
                 });
                 tempHelpPopup.addEventListener('click', (e) => e.stopPropagation());
+            }
+
+            // Set default invoice date to today if empty or placeholder
+            const invDateField = document.getElementById('field-invoice-date');
+            if (invDateField) {
+                const txt = invDateField.textContent.trim();
+                if (!txt || txt.includes('enter') || txt.includes('click here')) {
+                    const today = new Date();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const yyyy = today.getFullYear();
+                    invDateField.textContent = `${mm}/${dd}/${yyyy}`;
+                }
             }
         });
     </script>
