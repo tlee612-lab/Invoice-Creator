@@ -126,7 +126,6 @@
             <div class="modal-tabs">
                 <div class="modal-tab active" data-tab="webhook" onclick="switchTab('webhook')">Webhook Sync</div>
                 <div class="modal-tab" data-tab="ai" onclick="switchTab('ai')">AI Assistant</div>
-                <div class="modal-tab" data-tab="codes" onclick="switchTab('codes')">Name Codes</div>
             </div>
 
             <div id="tab-webhook" class="tab-content active">
@@ -153,7 +152,9 @@
                     </div>
                 </div>
                 <div class="instructions" style="font-size: 10px;">Client and investigator names will be replaced with codes on import.</div>
-            </div>
+             </div>
+
+            <div id="tab-ai" class="tab-content">
                 <div class="settings-field">
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
                         <label style="margin-bottom: 0;">AI Provider & Model</label>
@@ -191,53 +192,9 @@
                             </optgroup>
                         </select>
                         <button class="btn-icon" id="lock-ai-model" onclick="toggleField('setting-ai-model', 'lock')" title="Unlock Field">🔒</button>
-                    </div>
-                </div>
-                <div class="settings-field">
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <label style="margin-bottom: 0;">AI API Key</label>
-                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
-                    </div>
-                    <div class="input-group">
-                        <input type="password" id="setting-ai-key" placeholder="Enter your API Key" readonly>
-                        <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">👁️</button>
-                        <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">🔒</button>
-                        <button class="btn-test" onclick="testAI()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
-                    </div>
-                </div>
-                <div class="settings-field" id="group-ai-base-url" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <label style="margin-bottom: 0;">API Base URL (e.g., http://localhost:11434/v1)</label>
-                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
-                    </div>
-                    <div class="input-group">
-                        <input type="text" id="setting-ai-base-url" placeholder="https://api.openai.com/v1" readonly>
-                        <button class="btn-icon" id="lock-ai-base-url" onclick="toggleField('setting-ai-base-url', 'lock')" title="Unlock Field">🔒</button>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 15px;">
-                    <div class="settings-field" style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                            <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span></label>
-                            <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
-                        </div>
-                        <div class="input-group">
-                            <input type="range" id="setting-ai-temp" min="0" max="2" step="0.1" value="0.7" disabled oninput="document.getElementById('val-ai-temp').textContent=this.value">
-                            <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">🔒</button>
-                        </div>
-                    </div>
-                    <div class="settings-field" style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                            <label style="margin-bottom: 0;">Max Tokens</label>
-                            <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
-                        </div>
-                        <div class="input-group">
-                            <input type="number" id="setting-ai-tokens" placeholder="2048" disabled>
-                            <button class="btn-icon" id="lock-ai-tokens" onclick="toggleField('setting-ai-tokens', 'lock')" title="Unlock Field">🔒</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="settings-field">
+            </div>
+
+            <div id="tab-ai" class="tab-content">
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
                         <label style="margin-bottom: 0;">System Instructions (Analysis Prompt)</label>
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
