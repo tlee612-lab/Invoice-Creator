@@ -1031,6 +1031,18 @@
                 if (lockBtn) lockBtn.textContent = newState ? '🔒' : '🔓';
                 if (!newState) input.focus();
 
+                // Explicitly persist current field value at lock time
+                const value = input.value;
+                switch(id) {
+                    case 'setting-webhook': CONFIG.GOOGLE_WEBHOOK_URL = value; break;
+                    case 'setting-ai-key': CONFIG.AI_API_KEY = value; break;
+                    case 'setting-ai-model': CONFIG.AI_MODEL = value; break;
+                    case 'setting-ai-instructions': CONFIG.AI_INSTRUCTIONS = value; break;
+                    case 'setting-ai-base-url': CONFIG.AI_BASE_URL = value; break;
+                    case 'setting-ai-temp': CONFIG.AI_TEMPERATURE = parseFloat(value) || 0.7; break;
+                    case 'setting-ai-tokens': CONFIG.AI_MAX_TOKENS = parseInt(value) || 2048; break;
+                }
+
                 // Update and save lock state
                 CONFIG.FIELD_LOCKS[id] = newState;
                 saveSettings();
