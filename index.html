@@ -417,7 +417,8 @@
             AI_INSTRUCTIONS: '',
             AI_BASE_URL: '',
             AI_TEMPERATURE: 0.7,
-            AI_MAX_TOKENS: 2048
+            AI_MAX_TOKENS: 2048,
+            FIELD_LOCKS: {}
         };
 
         // Helper function to get or create case header and subtotal rows
@@ -979,27 +980,31 @@
             // Default to the first tab (webhook)
             switchTab('webhook');
 
-            // Ensure fields are locked when opening
-            ['setting-webhook', 'setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'].forEach(id => {
-                const input = document.getElementById(id);
-                if (!input) return;
-                
-                const suffix = id.replace('setting-', '');
-                const lockBtn = document.getElementById('lock-' + suffix);
-
-                const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number';
-                
-                if (useDisabled) {
-                    input.disabled = true;
-                } else {
-                    input.readOnly = true;
-                }
-                input.style.background = '#f5f5f5';
-                if (lockBtn) lockBtn.textContent = '🔒';
+            // Ensure fields are locked/unlocked per saved state
+            const fieldIds = ['setting-webhook', 'setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'];
+            fieldIds.forEach(id => {
+                const locked = CONFIG.FIELD_LOCKS[id] !== false; // default locked
+                setFieldLockState(id, locked);
             });
             
             document.getElementById('settings-modal').style.display = 'flex';
         }
+        function setFieldLockState(id, locked) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const suffix = id.replace('setting-', '');
+            const lockBtn = document.getElementById('lock-' + suffix);
+            const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number';
+            
+            if (useDisabled) {
+                input.disabled = locked;
+            } else {
+                input.readOnly = locked;
+            }
+            input.style.background = locked ? '#f5f5f5' : '#fff';
+            if (lockBtn) lockBtn.textContent = locked ? '🔒' : '🔓';
+        }
+
         function toggleField(id, action) {
             const input = document.getElementById(id);
             if (!input) return;
@@ -1025,6 +1030,10 @@
                 
                 if (lockBtn) lockBtn.textContent = newState ? '🔒' : '🔓';
                 if (!newState) input.focus();
+
+                // Update and save lock state
+                CONFIG.FIELD_LOCKS[id] = newState;
+                saveSettings();
             }
         }
 
@@ -1119,7 +1128,8 @@
                 aiInstructions: CONFIG.AI_INSTRUCTIONS,
                 aiBaseUrl: CONFIG.AI_BASE_URL,
                 aiTemp: CONFIG.AI_TEMPERATURE,
-                aiTokens: CONFIG.AI_MAX_TOKENS
+                aiTokens: CONFIG.AI_MAX_TOKENS,
+                locks: CONFIG.FIELD_LOCKS
             }));
             
             updateActiveModelDisplay();
@@ -1175,6 +1185,7 @@
                 CONFIG.AI_BASE_URL = settings.aiBaseUrl || '';
                 CONFIG.AI_TEMPERATURE = settings.aiTemp || 0.7;
                 CONFIG.AI_MAX_TOKENS = settings.aiTokens || 2048;
+                CONFIG.FIELD_LOCKS = settings.locks || {};
             }
 
             updateActiveModelDisplay();
