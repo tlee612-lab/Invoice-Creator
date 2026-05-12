@@ -25,19 +25,21 @@
         .ai-loading { color: #0066cc; font-style: italic; }
         /* Settings Modal Styles */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 600px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 15px; }
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #0066cc; display: flex; justify-content: space-between; align-items: center; }
         .modal-tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
-        .modal-tab { padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; font-weight: bold; color: #666; transition: all 0.2s; }
+        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: bold; color: #666; transition: all 0.2s; }
         .modal-tab:hover { color: #0066cc; }
         .modal-tab.active { color: #0066cc; border-bottom-color: #0066cc; }
         .tab-content { display: none; min-height: 120px; }
         .tab-content.active { display: block; }
-        .settings-field { margin-bottom: 15px; }
-        .settings-field label { display: block; font-size: 12px; margin-bottom: 5px; color: #666; font-weight: bold; }
+        .settings-field { margin-bottom: 20px; }
+        .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: #333; font-weight: bold; }
         .input-group { display: flex; gap: 5px; }
-        .settings-field input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #fff; }
+        .settings-field input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
         .settings-field input:read-only { background: #f5f5f5; color: #777; cursor: not-allowed; }
+        .settings-field select { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; }
+        .settings-field textarea { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; background: #fff; resize: vertical; }
         .btn-icon { background: #f8f9fa; border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; }
         .btn-test { background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
         .btn-test:hover { background: #0052a3; }
@@ -188,7 +190,7 @@
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
                     </div>
                     <div class="input-group">
-                        <input type="password" id="setting-ai-key" placeholder="Enter your API Key" readonly>
+                        <input type="password" id="setting-ai-key" placeholder="Enter your API Key" readonly style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0.5px;">
                         <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">👁️</button>
                         <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">🔒</button>
                         <button class="btn-test" onclick="testAI()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
@@ -243,8 +245,8 @@
             </div>
 
             <div class="modal-actions">
-                <button onclick="closeSettings()" style="padding: 8px 16px; cursor: pointer; background: #eee; border: 1px solid #ddd; border-radius: 4px;">Cancel</button>
-                <button onclick="saveSettings()" style="padding: 8px 16px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px;">Save Settings</button>
+                <button onclick="closeSettings()" style="padding: 10px 20px; cursor: pointer; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">Cancel</button>
+                <button onclick="saveSettings()" style="padding: 10px 20px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; font-size: 14px;">Save Settings</button>
             </div>
         </div>
     </div>
