@@ -13,74 +13,84 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <title>Invoice Creator</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
-        body { background: #1a1a1a; padding: 20px; color: #e0e0e0; }
+        :root {
+          --bg: #0d0f14;
+          --surface: #141720;
+          --surface2: #1c2030;
+          --border: #0090ff;
+          --accent: #00c8a0;
+          --accent2: #0090ff;
+          --text: #e8eef8;
+          --muted: #8a96ac;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; }
         
         /* App Controls */
-        #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: #2d2d2d; padding: 20px; border-radius: 8px; border: 2px dashed #0066cc; }
-        #import-zone h3 { margin-bottom: 2px; font-size: 16px; color: #0066cc; }
-        #active-model-display { font-size: 12px; color: #66ccff; font-weight: bold; margin-right: 8px; text-shadow: 0 0 3px rgba(0,102,204,0.4); }
-        #paste-area { width: 100%; height: 80px; padding: 10px; border: 1px solid #555; border-radius: 4px; resize: vertical; font-size: 13px; background: #1e1e1e; color: #e0e0e0; }
-        .instructions { font-size: 11px; color: #aaa; margin-top: 5px; }
-        #ai-results { margin-top: 15px; padding: 12px; background: #252525; border-left: 4px solid #0066cc; border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: #e0e0e0; }
-        .ai-loading { color: #0066cc; font-style: italic; }
+        #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: var(--surface); padding: 20px; border-radius: 8px; border: 2px dashed var(--border); }
+        #import-zone h3 { margin-bottom: 2px; font-size: 16px; color: var(--border); }
+        #active-model-display { font-size: 12px; color: var(--accent); font-weight: bold; margin-right: 8px; }
+        .instructions { font-size: 11px; color: var(--muted); margin-top: 5px; }
+        #ai-results { margin-top: 15px; padding: 12px; background: var(--surface); border-left: 4px solid var(--border); border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: var(--text); }
+        .ai-loading { color: var(--border); font-style: italic; }
         /* Settings Modal Styles */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: #2d2d2d; padding: 30px; border-radius: 8px; width: 600px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: #e0e0e0; }
-        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #0066cc; display: flex; justify-content: space-between; align-items: center; }
-        .modal-tabs { display: flex; border-bottom: 1px solid #555; margin-bottom: 15px; }
-        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: #aaa; transition: all 0.2s; }
-        .modal-tab:hover { color: #fff; }
-        .modal-tab.active { color: #fff; border-bottom-color: #0066cc; font-weight: 700; }
+        .modal-content { background: var(--surface); padding: 30px; border-radius: 8px; width: 600px; max-width: 95vw; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: var(--text); }
+        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 15px; }
+        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: var(--muted); transition: all 0.2s; }
+        .modal-tab:hover { color: var(--accent); }
+        .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
         .tab-content { display: none; min-height: 120px; }
         .tab-content.active { display: block; }
         .settings-field { margin-bottom: 20px; }
-        .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: #fff; font-weight: 700; }
+        .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--text); font-weight: 700; }
         .input-group { display: flex; gap: 5px; }
-        .settings-field input { flex: 1; padding: 10px; border: 1px solid #777; border-radius: 4px; font-size: 14px; background: #111; color: #fff; font-weight: 500; }
-        .settings-field input:read-only { background: #1a1a1a; color: #bbb; cursor: not-allowed; font-weight: 400; }
-        .settings-field input::placeholder { color: #888; }
-        .settings-field select { flex: 1; padding: 10px; border: 1px solid #777; border-radius: 4px; font-size: 14px; background: #111; color: #fff; font-weight: 500; }
-        .settings-field select:disabled { background: #1a1a1a; color: #bbb; cursor: not-allowed; font-weight: 400; }
-        .settings-field textarea { flex: 1; padding: 10px; border: 1px solid #777; border-radius: 4px; font-size: 14px; background: #111; color: #fff; font-weight: 500; resize: vertical; }
-        .settings-field textarea:read-only { background: #1a1a1a; color: #bbb; cursor: not-allowed; font-weight: 400; }
-        .settings-field textarea::placeholder { color: #888; }
-        .btn-icon { background: #3d3d3d; border: 1px solid #555; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; color: #e0e0e0; }
-        .btn-test { background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
-        .btn-test:hover { background: #0052a3; }
+        .settings-field input, .settings-field select, .settings-field textarea { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; background: var(--surface2); color: var(--text); font-family: 'Barlow', sans-serif; font-weight: 500; outline: none; transition: border-color 0.2s; }
+        .settings-field input:focus, .settings-field select:focus, .settings-field textarea:focus { border-color: var(--accent); }
+        .settings-field input:read-only, .settings-field select:disabled, .settings-field textarea:read-only { background: var(--surface); color: var(--muted); cursor: not-allowed; font-weight: 400; }
+        .settings-field input::placeholder, .settings-field textarea::placeholder { color: var(--muted); opacity: 0.7; }
+        .btn-icon { background: var(--surface2); border: 1px solid var(--border); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; color: var(--text); }
+        .btn-icon:hover { background: var(--surface); border-color: var(--accent); }
+        .btn-test { background: var(--accent); color: var(--bg); border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-test:hover { background: var(--accent2); color: var(--bg); }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
-        .btn-close:hover { color: #fff; }
+        .btn-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); }
+        .btn-close:hover { color: var(--text); }
+        /* Drop area button hover effect */
+        #import-zone button:hover { background: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }
 
-        .invoice-container { max-width: 950px; margin: 0 auto; background: #1e1e1e; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: #e0e0e0; }
+        .invoice-container { max-width: 950px; margin: 0 auto; background: var(--surface); padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: var(--text); }
         @media print { #import-zone, #ai-results, .modal-overlay { display: none !important; } body { padding: 0; background: white; } .invoice-container { box-shadow: none; padding: 0; background: white; color: black; } }
 
-        .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #555; gap: 20px; }
-        .vendor-info { margin-left: auto; margin-right: 80px; text-align: left; font-size: 12px; color: #ccc; white-space: nowrap; }
+        .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); gap: 20px; }
+        .vendor-info { margin-left: auto; margin-right: 80px; text-align: left; font-size: 12px; color: var(--muted); white-space: nowrap; }
         .header img { height: 80px; width: 80px; flex-shrink: 0; }
-        [contenteditable="true"] { cursor: text; padding: 2px 4px; border-radius: 3px; transition: background 0.2s; }
-        .placeholder-bg { background-color: #333 !important; color: #777 !important; }
-        [contenteditable="true"]:hover { background: #333; outline: 1px dashed #0066cc; color: #e0e0e0; }
-        .company-info h1 { font-size: 24px; margin-bottom: 5px; color: #e0e0e0; }
-        .company-details { font-size: 12px; color: #aaa; line-height: 1.5; }
+        [contenteditable="true"] { cursor: text; padding: 4px 6px; border-radius: 4px; transition: all 0.2s; background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+        [contenteditable="true"]:hover { background: var(--surface); border-color: var(--accent); outline: none; }
+        [contenteditable="true"]:focus { background: var(--surface); border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px rgba(0,200,160,0.2); }
+        .placeholder-bg { background-color: var(--surface) !important; color: var(--muted) !important; }
+        .placeholder-bg:focus { background-color: var(--surface) !important; color: var(--muted) !important; }
+        .company-info h1 { font-size: 24px; margin-bottom: 5px; color: var(--text); }
+        .company-details { font-size: 12px; color: var(--muted); line-height: 1.5; }
         .top-section { display: flex; gap: 40px; margin-bottom: 5px; }
         .client-section, .invoice-details { flex: 1; }
-        .section-title { font-size: 12px; font-weight: bold; color: #aaa; text-transform: uppercase; margin-bottom: 8px; }
-        .client-info { font-size: 12px; color: #e0e0e0; line-height: 1.6; }
+        .section-title { font-size: 12px; font-weight: bold; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+        .client-info { font-size: 12px; color: var(--text); line-height: 1.6; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; }
-        .section-heading { font-size: 13px; font-weight: bold; background: #333; padding: 8px; margin-top: 5px; margin-bottom: 0; color: #e0e0e0; }
-        table thead { background: #252525; }
-        table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid #555; color: #e0e0e0; }
-        table td { padding: 6px; border-bottom: 1px solid #444; white-space: nowrap; color: #ccc; }
-        table tr.case-header td { background: #2a2a2a; font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid #555; color: #e0e0e0; }
-        table tr.subtotal td { background: #252525; font-weight: bold; border-top: 2px solid #555; border-bottom: 2px solid #555; padding-top: 6px; padding-bottom: 6px; color: #e0e0e0; }
-        table tr.grand-total td { background: #252525; color: #fff; font-weight: bold; border-top: 2px solid #666; padding: 8px 6px; }
+        .section-heading { font-size: 13px; font-weight: bold; background: var(--surface2); padding: 8px; margin-top: 5px; margin-bottom: 0; color: var(--text); }
+        table thead { background: var(--surface2); }
+        table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--text); }
+        table td { padding: 6px; border-bottom: 1px solid var(--border); white-space: nowrap; color: var(--text); }
+        table tr.case-header td { background: var(--surface); font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+        table tr.subtotal td { background: var(--surface2); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding-top: 6px; padding-bottom: 6px; color: var(--text); }
+        table tr.grand-total td { background: var(--surface2); color: var(--accent); font-weight: bold; border-top: 2px solid var(--accent); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
-        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid #666; }
-        .blue-text { color: #0066cc; }
-        .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #555; }
+        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid var(--accent); }
+        .blue-text { color: var(--border); }
+        .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border); }
         .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 12px; }
-        .total-item { display: flex; justify-content: space-between; padding: 8px; background: #252525; border: 1px solid #444; color: #e0e0e0; }
+        .total-item { display: flex; justify-content: space-between; padding: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
         #import-zone textarea + div button {
             width: 100% !important;
             min-width: 0 !important;
@@ -95,24 +105,24 @@
 <body>
     <div id="import-zone">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 16px; color: #0066cc;">Data Import</h3>
+            <h3 style="margin: 0; font-size: 16px; color: var(--border);">Data Import</h3>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="active-model-display"></span>
-                <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
+                <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
             </div>
         </div>
-        <div style="font-size: 11px; color: #aaa; margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
         <textarea id="paste-area" placeholder="Paste spreadsheet data here (or drop a CSV file)..."></textarea>
         <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
-            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: #0088ff; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Scan PDF</button>
-            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: #ff6b6b; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
-            <button onclick="window.print()" title="Print invoice" style="padding: 6px 8px; cursor: pointer; background: #40d47a; color: #000; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
-            <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: #1abc9c; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
-            <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: #ffc107; color: #000; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
-            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: #dc3545; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
-            <button onclick="sendToGoogleSheet()" title="Send invoice to Google Sheets" style="padding: 6px 8px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">☁️ Send</button>
-            <button onclick="pullFromGoogleSheet()" title="Pull invoice from Google Sheets" style="padding: 6px 8px; cursor: pointer; background: #17a2b8; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">⬇️ Pull</button>
-            <button onclick="analyzeInvoiceAI()" title="AI analysis of invoice" style="padding: 6px 8px; cursor: pointer; background: #9b59b6; color: white; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
+            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Scan PDF</button>
+            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
+            <button onclick="window.print()" title="Print invoice" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
+            <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
+            <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
+            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
+            <button onclick="sendToGoogleSheet()" title="Send invoice to Google Sheets" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">☁️ Send</button>
+            <button onclick="pullFromGoogleSheet()" title="Pull invoice from Google Sheets" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">⬇️ Pull</button>
+            <button onclick="analyzeInvoiceAI()" title="AI analysis of invoice" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="display:none">
             <input type="file" id="json-input" accept=".json" style="display:none">
@@ -249,8 +259,8 @@
             </div>
 
             <div class="modal-actions">
-                <button onclick="closeSettings()" style="padding: 10px 20px; cursor: pointer; background: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">Cancel</button>
-                <button onclick="saveSettings()" style="padding: 10px 20px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; font-size: 14px;">Save Settings</button>
+                <button onclick="closeSettings()" style="padding: 8px 16px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px;">Cancel</button>
+                <button onclick="saveSettings()" style="padding: 8px 16px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px;">Save Settings</button>
             </div>
         </div>
     </div>
@@ -259,7 +269,7 @@
         <div class="header">
             <img src="logo.jpg" alt="Logo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' rx=\'20\' fill=\'%230066cc\'/%3E%3Ccircle cx=\'40\' cy=\'40\' r=\'20\' fill=\'none\' stroke=\'white\' stroke-width=\'6\'/%3E%3Cline x1=\'55\' y1=\'55\' x2=\'80\' y2=\'80\' stroke=\'white\' stroke-width=\'10\' stroke-linecap=\'round\'/%3E%3C/svg%3E'; this.onerror=null;">
             <div class="company-info">
-                <h1>THOMAS LEE INVESTIGATIONS</h1>
+                <h1 style="font-size: 24px; margin-bottom: 5px; color: var(--text);">THOMAS LEE INVESTIGATIONS</h1>
                 <div class="company-details">
                     427 Rodale Dr. Eagle Point, OR 97524<br>
                     tlee.investigations@gmail.com<br>
@@ -273,7 +283,7 @@
                 <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <div id="pae-date-note" style="color: #888; font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since pae was produced</div>
+                <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since pae was produced</div>
             </div>
         </div>
         <div class="top-section">
