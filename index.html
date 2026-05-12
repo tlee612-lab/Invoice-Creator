@@ -248,12 +248,20 @@
 
                 <div class="settings-field">
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span></label>
+                        <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span> <span id="temp-help-icon" title="Recommended 0.5-0.7 for invoice analysis" style="cursor: help; color: var(--accent);">ⓘ</span></label>
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
                     </div>
                     <div class="input-group">
                         <input type="range" id="setting-ai-temp" min="0" max="2" step="0.1" value="0.7" disabled oninput="document.getElementById('val-ai-temp').textContent=this.value">
                         <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                    <div id="temp-help-popup" style="display: none; position: absolute; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 300px; z-index: 100;">
+                        <strong>Temperature</strong><br>
+                        Controls AI response randomness:<br>
+                        • <strong>0.0–0.3:</strong> Focused, consistent (facts)<br>
+                        • <strong>0.5–0.7 (recommended):</strong> Balanced (invoice review)<br>
+                        • <strong>0.8–1.5:</strong> Creative, varied<br>
+                        • <strong>1.5+:</strong> Very random, unreliable
                     </div>
                 </div>
 
@@ -1695,6 +1703,26 @@
 
             // Initial drag handle cursor on header
             header.style.cursor = 'grab';
+
+            // Temperature help popup toggle
+            const tempHelpIcon = document.getElementById('temp-help-icon');
+            const tempHelpPopup = document.getElementById('temp-help-popup');
+            if (tempHelpIcon && tempHelpPopup) {
+                tempHelpIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isVisible = tempHelpPopup.style.display === 'block';
+                    tempHelpPopup.style.display = isVisible ? 'none' : 'block';
+                    // Position near the icon
+                    const rect = tempHelpIcon.getBoundingClientRect();
+                    tempHelpPopup.style.left = (rect.left - 100) + 'px';
+                    tempHelpPopup.style.top = (rect.bottom + 5) + 'px';
+                });
+                // Hide when clicking elsewhere
+                document.addEventListener('click', () => {
+                    tempHelpPopup.style.display = 'none';
+                });
+                tempHelpPopup.addEventListener('click', (e) => e.stopPropagation());
+            }
         });
     </script>
 </body>
