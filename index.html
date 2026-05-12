@@ -1230,8 +1230,9 @@
         }
 
         // Name conversion via AI — extracts names from service hours and assigns labels
-        function convertNamesToCodes() {
-            // Collect all service hours rows
+        // Name conversion via AI — extracts names from service hours and assigns labels
+        async function convertNamesToCodes() {
+            // 1. Collect all service hours rows with case numbers
             const rows = [];
             document.querySelectorAll('#table-hours tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
                 const cells = tr.querySelectorAll('td');
@@ -1241,6 +1242,129 @@
                     const caseNum = caseEl ? caseEl.textContent.replace('Case:', '').trim() : 'Unknown';
                     rows.push({ desc, case: caseNum, element: cells[2] });
                 }
+            });
+
+            if (rows.length === 0) {
+                alert("No service entries found to scan.");
+                return;
+            }
+
+            // 2. Prepare data for AI: group by case
+            const caseGroups = {};
+            rows.forEach(r => {
+                if (!caseGroups[r.case]) caseGroups[r.case] = [];
+                caseGroups[r.case].push(r.desc);
+            });
+
+            const payload = Object.entries(caseGroups).map(([caseNum, descs]) => 
+                `Case ${caseNum}:\n` + descs.map((d, i) => `${i + 1}. ${d}`).join('\n')
+            ).join('\n\n');
+
+            // 3. Call AI to extract names
+            if (!CONFIG.AI_API_KEY || !CONFIG.AI_MODEL) {
+                alert("AI not configured. Set API key and model in Settings.");
+                return;
+            }
+
+            const prompt = `From the following service descriptions, extract all person names (including witnesses, victims, clients, POIs, investigators, etc.). Names may be capitalized or lowercase. Return ONLY a JSON array of unique name strings, e.g., ["John Smith","Jane Doe"]. Do not include explanations.\n\n${payload}`;
+
+            let extractedNames = [];
+            try {
+                const { model, apiKey } = CONFIG;
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    body = JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+                    });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = JSON.stringify({
+                        model,
+                        max_tokens: 2048,
+                        temperature: 0.3,
+                        system: 'You are a text analysis assistant. Return only a JSON array of person names found in the text, with no additional commentary.',
+                        messages: [{ role: 'user', content: prompt }]
+                    });
+                } else {
+                    // OpenAI-compatible
+                    const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, '') || 'https://api.openai.com/v1';
+                    url = baseUrl + '/chat/completions';
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = JSON.stringify({
+                        model: model === 'custom' ? 'gpt-3.5-turbo' : model,
+                        messages: [
+                            { role: 'system', content: 'Return only a JSON array of person names.' },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: 0.3,
+                        max_tokens: 2048
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+                if (!response.ok) throw new Error(`AI request failed: ${response.status}`);
+
+                const result = await response.json();
+                let text = '';
+                if (model.startsWith('gemini')) {
+                    text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                } else if (model.startsWith('claude')) {
+                    text = result.content?.[0]?.text || '';
+                } else {
+                    text = result.choices?.[0]?.message?.content || '';
+                }
+
+                // Parse JSON array from response
+                const match = text.match(/\[.*\]/s);
+                if (match) {
+                    extractedNames = JSON.parse(match[0]);
+                } else {
+                    // Fallback: try to extract names line by line
+                    extractedNames = text.split('\n')
+                        .map(l => l.replace(/^[\d\.\-\*•\s]+/, '').trim())
+                        .filter(l => l.length > 0);
+                }
+            } catch (e) {
+                alert('AI extraction failed: ' + e.message);
+                return;
+            }
+
+            // 4. Build name -> cases map
+            const nameMap = new Map();
+            rows.forEach(({ desc, caseNum }) => {
+                extractedNames.forEach(name => {
+                    if (desc.toLowerCase().includes(name.toLowerCase())) {
+                        if (!nameMap.has(name)) nameMap.set(name, new Set());
+                        nameMap.get(name).add(caseNum);
+                    }
+                });
+            });
+
+            if (nameMap.size === 0) {
+                alert("No matching names found in descriptions.");
+                return;
+            }
+
+            // 5. Build assignments array
+            const assignments = [];
+            nameMap.forEach((cases, name) => {
+                assignments.push({
+                    name,
+                    cases: Array.from(cases),
+                    label: 'skip'
+                });
+            });
+            assignments.sort((a, b) => a.name.localeCompare(b.name));
+
+            // 6. Show modal for user to assign labels
+            showNameAssignmentModal(assignments, rows);
+        }
             });
 
             if (rows.length === 0) {
@@ -1346,6 +1470,81 @@
             }
 
             buildModal();
+        }
+
+        // Show modal to assign labels to extracted names
+        function showNameAssignmentModal(assignments, rows) {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.display = 'flex';
+            const modal = document.createElement('div');
+            modal.className = 'modal-content';
+            modal.style.width = '700px';
+            modal.style.maxHeight = '80vh';
+            modal.style.overflow = 'auto';
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <span>Assign Name Labels</span>
+                    <button class="btn-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                <div style="margin: 16px 0; font-size: 12px; color: var(--muted); line-height: 1.5;">
+                    For each name found, assign a label. The name will be replaced with that label in all cases.<br>
+                    <strong>Note:</strong> Client and Investigator header fields are never changed.
+                </div>
+                <div style="display:grid;grid-template-columns:1.5fr 1fr 120px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+                    <div>Name</div>
+                    <div>Case(s)</div>
+                    <div style="text-align:center">Label</div>
+                </div>
+                <div id="name-assignments-list"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button id="applyNameLabels" style="padding:10px 16px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--bg);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer">Apply</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const listEl = modal.querySelector('#name-assignments-list');
+            assignments.forEach((item, idx) => {
+                const caseStr = item.cases.join(', ');
+                const row = document.createElement('div');
+                row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 120px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px';
+                row.innerHTML = `
+                    <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.name}">${item.name}</div>
+                    <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${caseStr}">${caseStr}</div>
+                    <select data-idx="${idx}" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center">
+                        <option value="skip">— Skip —</option>
+                        <option value="witness">Witness</option>
+                        <option value="poi">POI</option>
+                        <option value="client">Client</option>
+                        <option value="victim">Victim</option>
+                    </select>
+                `;
+                listEl.appendChild(row);
+            });
+
+            document.getElementById('applyNameLabels').onclick = () => {
+                // Read selections
+                assignments.forEach((item, idx) => {
+                    const sel = modal.querySelector(`select[data-idx="${idx}"]`);
+                    item.label = sel.value;
+                });
+                overlay.remove();
+
+                // Apply replacements with sequential numbering per category
+                const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
+                assignments.forEach(({ name, label }) => {
+                    if (label === 'skip') return;
+                    counters[label] += 1;
+                    const replacement = `${label.charAt(0).toUpperCase() + label.slice(1)} ${counters[label]}`;
+                    rows.forEach(({ element }) => {
+                        element.textContent = element.textContent.replace(name, replacement);
+                    });
+                });
+
+                saveInvoiceData();
+                alert('Names converted successfully.');
+            };
         }
 
         // Confirm modal functions
