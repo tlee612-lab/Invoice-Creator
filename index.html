@@ -11,6 +11,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <title>Invoice Creator</title>
     <style>
         :root {
@@ -86,14 +87,36 @@
         .invoice-container { max-width: 950px; margin: 0 auto; background: var(--surface); padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: var(--text); }
         @media print { 
             #import-zone, #ai-results, .modal-overlay { display: none !important; } 
-            body { padding: 0; background: white; } 
-            .invoice-container { box-shadow: none; padding: 0; background: white; color: black; }
-            .header { border-bottom-color: black; }
-            .vendor-info { 
+            body { background: white !important; margin: 0; padding: 0; }
+            .invoice-container { 
+                max-width: 100% !important;
+                box-shadow: none !important;
+                padding: 0.5in !important;
+                background: white !important;
                 color: black !important;
-                font-size: 11px;
             }
-            .vendor-info * { color: black !important; }
+            .invoice-container, .invoice-container * { 
+                background: white !important;
+                color: black !important;
+                border-color: black !important;
+            }
+            table, th, td {
+                border-color: black !important;
+            }
+            .placeholder-bg, [contenteditable="true"] {
+                background: white !important;
+                color: black !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            [contenteditable="true"]:hover, [contenteditable="true"]:focus {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+                background: white !important;
+            }
+            .header { border-bottom-color: black !important; }
             .pae-dates-flex {
                 flex-wrap: nowrap !important;
                 gap: 8px !important;
@@ -101,17 +124,7 @@
             .pae-dates-flex div {
                 white-space: nowrap;
             }
-            table { border-color: black; }
-            .hours-col, .miles-col, .amount-col { border-color: black; }
-            .subtotal { border-top: 2px solid black; }
-            .invoice-totals-table td { border-color: black; }
-        }
-            .vendor-info span { color: black !important; }
-            .vendor-info strong { color: black !important; }
-            table { border-color: black; }
-            .hours-col, .miles-col, .amount-col { border-color: black; }
-            .subtotal { border-top: 2px solid black; }
-            .invoice-totals-table td { border-color: black; }
+            .subtotal { border-top: 2px solid black !important; border-bottom: 2px solid black !important; }
         }
 
         .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); gap: 20px; }
@@ -169,15 +182,16 @@
         <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
             <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Scan PDF</button>
             <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
-            <button onclick="window.print()" title="Print invoice" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
+            <button onclick="window.print()" title="Print invoice using browser print" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
+            <button onclick="downloadPdf()" title="Download invoice as PDF file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 PDF</button>
             <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
-            <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
+            <label for="json-input" title="Import invoice from JSON" tabindex="0" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box; display: inline-block; text-align: center; margin: 0;">📥 Import</label>
             <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
             <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Anonymize</button>
             <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">✅ Validate</button>
         </div>
-            <input type="file" id="pdf-input" accept=".pdf" style="display:none">
-            <input type="file" id="json-input" accept=".json" style="display:none">
+            <input type="file" id="pdf-input" accept=".pdf" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+            <input type="file" id="json-input" accept=".json" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
             <span id="save-indicator">✔ Saved to Browser</span>
         </div>
     </div>
@@ -363,11 +377,15 @@
             </div>
             <div class="vendor-info">
                 <strong>Vendor #:</strong> <span style="color: red;">3664110013-000</span><br>
-                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <strong>Est. Trav Costs:</strong> <span id="field-trav-costs" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">click here</span><br>
+                <strong>Est. Trav Costs:</strong> <span id="field-trav-costs" class="placeholder-bg" contenteditable="true">click here</span><br>
+                <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">click here</span><br>
+                <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">click here</span><br>
+                <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">click here</span>
+                <div style="display: flex; gap: 16px; margin-top: 4px;">
+                    <div><strong>PAE Eff:</strong> <span id="field-pae-effective" class="placeholder-bg" contenteditable="true">click here</span></div>
+                    <div><strong>PAE Exp:</strong> <span id="field-pae-expiration" class="placeholder-bg" contenteditable="true">click here</span></div>
+                </div>
                 <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since PAE was produced</div>
             </div>
         </div>
@@ -375,23 +393,19 @@
             <div class="client-section">
                 <div class="section-title">Client Information</div>
                 <div class="client-info">
-                    <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                    <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                    <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <strong>PAE Eff:</strong> <span id="field-pae-effective" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <strong>PAE Exp:</strong> <span id="field-pae-expiration" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">click here</span><br>
+                    <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">click here</span><br>
+                    <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">click here</span><br>
+                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">click here</span><br>
                 </div>
             </div>
             <div class="invoice-details">
                 <div class="section-title">Invoice Details</div>
                 <div class="client-info">
-                    <strong>Investigator:</strong> <span id="field-investigator" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
-                    <strong>Invoice #:</strong> <span id="field-invoice-num" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
-                    <strong>Invoice Date:</strong> <span id="field-invoice-date" class="placeholder-bg" contenteditable="true">click to enter</span><br>
-                    <strong>Date Range:</strong> <span id="field-date-range" class="placeholder-bg" contenteditable="true">click to enter</span>
+                    <strong>Investigator:</strong> <span id="field-investigator" class="placeholder-bg" contenteditable="true">click here</span><br>
+                    <strong>Invoice #:</strong> <span id="field-invoice-num" class="placeholder-bg" contenteditable="true">click here</span><br>
+                    <strong>Invoice Date:</strong> <span id="field-invoice-date" class="placeholder-bg" contenteditable="true">click here</span><br>
+                    <strong>Date Range:</strong> <span id="field-date-range" class="placeholder-bg" contenteditable="true">click here</span>
                 </div>
             </div>
         </div>
@@ -773,7 +787,7 @@
         function extractHeaderInfo(fullText) {
             const patterns = {
                 client: /Client:\s*([^:\n]+?)(?=Case|Attorney|PAE|PA|County|$)/i,
-                case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*(\S+)/i,
+                case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*\d[A-Za-z0-9-]*)/i,
                 attorney: /Attorney:\s*([^:\n]+?)(?=PAE|PA|Case|Client|Authorization|$)/i,
                 pae: /(?:Authorization\s*No|PAE|PA)\s*(?:#|No\.?|Number)?\s*:?\s*(\d+)/i,
                 'trav-costs': /Est\.?\s*Trav(?:el)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
@@ -790,44 +804,47 @@
                 if (match && match[1]) {
                     const val = match[1].trim();
                     let targetId = '';
-                    
+
                     if (key === 'pae') {
                         targetId = 'field-pae';
                         const headerPae = document.getElementById('field-pae-header');
-                        if (headerPae) headerPae.textContent = val;
+                        if (headerPae && isFieldEmpty(headerPae)) headerPae.textContent = val;
                     } else if (key === 'pae-effective') {
                         const paeDate = new Date(val);
                         const noteEl = document.getElementById('pae-date-note');
                         if (noteEl && !isNaN(paeDate.getTime())) {
                             noteEl.style.display = paeDate < CONFIG.RATE_CUTOFF_DATE ? 'block' : 'none';
                         }
-                        // Store effective date in dedicated field
                         const effectiveEl = document.getElementById('field-pae-effective');
-                        if (effectiveEl) effectiveEl.textContent = val;
+                        if (effectiveEl && isFieldEmpty(effectiveEl)) effectiveEl.textContent = val;
                         // Auto-fill Invoice Date if it's currently a placeholder
                         const invDateEl = document.getElementById('field-invoice-date');
-                        if (invDateEl && (invDateEl.textContent.trim() === "" || invDateEl.textContent.includes("enter"))) {
+                        if (invDateEl && isFieldEmpty(invDateEl)) {
                             invDateEl.textContent = val;
                         }
                         found = true;
-                        // continue to other patterns
                     } else if (key === 'pae-expiration') {
                         const expEl = document.getElementById('field-pae-expiration');
-                        if (expEl) expEl.textContent = val;
+                        if (expEl && isFieldEmpty(expEl)) expEl.textContent = val;
                         found = true;
-                        // continue to other patterns
                     } else {
                         targetId = `field-${key}`;
                     }
 
                     const el = document.getElementById(targetId);
-                    if (el) {
+                    if (el && isFieldEmpty(el)) {
                         el.textContent = val;
                         found = true;
                     }
                 }
             });
             return found;
+        }
+
+        // Helper: check if a field is empty or placeholder
+        function isFieldEmpty(el) {
+            const txt = el.textContent.trim();
+            return !txt || txt.includes('enter') || txt.includes('Drop') || txt.includes('click here');
         }
 
         function getInvoiceState() {
@@ -1780,22 +1797,155 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             confirmResolve = null;
         }
 
-        function exportToJson() {
-            const invoiceState = getInvoiceState();
+        // Apply print-friendly styles recursively with !important to override dark theme
+        function applyPrintStyles(el) {
+            // Set inline styles with !important priority
+            el.style.setProperty('color', '#000000', 'important');
+            el.style.setProperty('background-color', '#ffffff', 'important');
+            el.style.setProperty('border-color', '#000000', 'important');
+            // Recurse into children
+            el.querySelectorAll('*').forEach(child => {
+                child.style.setProperty('color', '#000000', 'important');
+                child.style.setProperty('background-color', '#ffffff', 'important');
+                child.style.setProperty('border-color', '#000000', 'important');
+            });
+        }
 
+        // Apply print-friendly styles recursively with !important to override dark theme
+        function applyPrintStyles(el) {
+            // Set inline styles with !important priority
+            el.style.setProperty('color', '#000000', 'important');
+            el.style.setProperty('background-color', '#ffffff', 'important');
+            el.style.setProperty('border', 'none', 'important');
+            el.style.setProperty('border-color', 'transparent', 'important');
+            el.querySelectorAll('*').forEach(child => {
+                child.style.setProperty('color', '#000000', 'important');
+                child.style.setProperty('background-color', '#ffffff', 'important');
+                child.style.setProperty('border', 'none', 'important');
+                child.style.setProperty('border-color', 'transparent', 'important');
+            });
+        }
+
+        // Get readable field value, skipping placeholder text
+        function getFieldValue(el) {
+            const txt = el.textContent.trim();
+            if (!txt || txt.includes('enter') || txt.includes('Drop') || txt.includes('click here')) {
+                return '';
+            }
+            return txt;
+        }
+
+        async function downloadPdf() {
+            const invoiceEl = document.querySelector('.invoice-container');
+            if (!invoiceEl) return;
+
+            // Build filename from case # and client name (skip placeholders)
+            const caseEl = document.getElementById('field-case');
+            const clientEl = document.getElementById('field-client');
+            const caseVal = getFieldValue(caseEl).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const clientVal = getFieldValue(clientEl).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const filename = caseVal && clientVal ? `Invoice_${caseVal}_${clientVal}.pdf` : (caseVal ? `Invoice_${caseVal}.pdf` : 'Invoice.pdf');
+
+            // Clone invoice and apply print-friendly styles to the clone only
+            const clone = invoiceEl.cloneNode(true);
+            applyPrintStyles(clone);
+
+            // Create modal overlay for preview
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:3000;padding:20px';
+            const modal = document.createElement('div');
+            modal.className = 'modal-content';
+            modal.style.cssText = 'background:#fff;border-radius:8px;padding:16px;max-width:90vw;max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
+            modal.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div style="font-weight:bold;font-size:16px;color:#000">Invoice Preview — Save as PDF</div>
+                    <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">&times;</button>
+                </div>
+                <div id="pdf-preview" style="flex:1;overflow:auto;border:1px solid #ddd;padding:16px;background:#fff"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end">
+                    <button id="btn-cancel-pdf" style="padding:8px 16px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer">Cancel</button>
+                    <button id="btn-save-pdf" style="padding:8px 16px;border-radius:4px;border:none;background:#0066cc;color:#fff;cursor:pointer">💾 Save PDF</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const previewContainer = modal.querySelector('#pdf-preview');
+            previewContainer.appendChild(clone);
+
+            // Cancel button
+            modal.querySelector('#btn-cancel-pdf').onclick = () => overlay.remove();
+
+            // Save button: generate PDF from the styled clone
+            modal.querySelector('#btn-save-pdf').onclick = async () => {
+                try {
+                    await html2pdf().set({
+                        margin:       0.4,
+                        filename:     filename,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                    }).from(clone).save();
+                    overlay.remove();
+                } catch (err) {
+                    console.error('PDF generation failed:', err);
+                    alert('Failed to generate PDF: ' + err.message);
+                }
+            };
+        }
+
+        // Get readable field value, skipping placeholder text
+        function getFieldValue(el) {
+            const txt = el.textContent.trim();
+            if (!txt || txt.includes('enter') || txt.includes('Drop') || txt.includes('click here')) {
+                return '';
+            }
+            return txt;
+        }
+
+        async function exportToJson() {
+            const invoiceState = getInvoiceState();
             const dataStr = JSON.stringify(invoiceState, null, 2);
             const blob = new Blob([dataStr], { type: "application/json" });
+
+            // Build filename from case # and client name (skip placeholders)
+            const caseEl = document.getElementById('field-case');
+            const clientEl = document.getElementById('field-client');
+            const caseVal = getFieldValue(caseEl).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const clientVal = getFieldValue(clientEl).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const filename = caseVal && clientVal ? `invoice_${caseVal}_${clientVal}.json` : (caseVal ? `invoice_${caseVal}.json` : 'invoice.json');
+
+            // Try File System Access API (Chrome/Edge) to let user choose location
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        types: [{ description: 'JSON file', accept: { 'application/json': ['.json'] } }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return;
+                } catch (err) {
+                    // User cancelled — don't download; other errors fall through
+                    if (err.name === 'AbortError') return;
+                    console.warn('showSaveFilePicker failed, using fallback:', err);
+                }
+            }
+
+            // Fallback: standard download (browser decides location)
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const pae = document.getElementById('field-pae').textContent.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            link.download = `invoice_backup_${pae || 'data'}.json`;
+            link.download = filename;
             link.href = url;
             link.click();
             URL.revokeObjectURL(url);
         }
 
-        function resetForm() {
-            if (!confirm("Are you sure you want to clear all data? This will wipe the memory and the screen.")) return;
+        async function resetForm() {
+            const confirmed = await showConfirmModal("Are you sure you want to clear all data? This will wipe the memory and the screen.");
+            if (!confirmed) return;
             document.querySelectorAll('tbody').forEach(tb => tb.innerHTML = '');
             localStorage.removeItem('invoiceData');
             window.location.reload();
@@ -1812,9 +1962,6 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
 
         function handleDataImport(rawText) {
             if (!rawText || !rawText.trim()) return;
-            
-            // Try to extract header info first (e.g. if the whole form was pasted)
-            extractHeaderInfo(rawText);
 
             // Split on newline, keep empty lines for index alignment
             const lines = rawText.split('\n');
@@ -1943,8 +2090,12 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             // Set investigator from paste if not already filled
             if (firstInvestigator) {
                 const invField = document.getElementById('field-investigator');
-                if (invField && (invField.textContent.trim() === '' || invField.textContent.includes('enter'))) {
-                    invField.textContent = firstInvestigator;
+                if (invField) {
+                    const current = invField.textContent.trim();
+                    const isPlaceholder = current === '' || current.includes('enter') || current === 'click here';
+                    if (isPlaceholder) {
+                        invField.textContent = firstInvestigator;
+                    }
                 }
             }
 
@@ -1974,15 +2125,12 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
 
         async function handlePdfFile(file) {
             try {
-                // Clear previous PAE-related fields
+                // Clear previous PAE-related fields only (not line items)
                 const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae', 'field-pae-effective', 'field-pae-expiration'];
                 paeFields.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.textContent = '';
                 });
-
-                // Clear only line item tables (totals table will be recalculated)
-                document.querySelectorAll('#table-hours tbody, #table-mileage tbody, #table-expenses tbody').forEach(tbody => tbody.innerHTML = '');
 
                 // Show a loading indicator here if desired
                 const arrayBuffer = await file.arrayBuffer();
@@ -1995,7 +2143,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                     fullText += textContent.items.map(item => item.str).join(" ") + " ";
                 }
                 const extracted = extractHeaderInfo(fullText);
-                // Always recalc totals after clearing tables, even if no header fields were extracted
+                // Recalc totals (line items unchanged, but amounts may depend on auth hours/rates)
                 updateInvoiceTotals();
                 if (extracted) {
                     saveInvoiceData();
@@ -2020,6 +2168,21 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             }
             // Check if any line items exist in tables
             if (document.querySelectorAll('.case-header').length > 0) return true;
+            return false;
+        }
+
+        function hasPaeInfo() {
+            // Check only PAE-related fields for actual values
+            const paeIds = ['field-pae-header', 'field-pae', 'field-pae-effective', 'field-pae-expiration', 'field-trav-costs', 'field-auth-serv', 'field-total-auth', 'field-auth-hours'];
+            for (const id of paeIds) {
+                const el = document.getElementById(id);
+                if (el) {
+                    const txt = el.textContent.trim();
+                    if (txt && !txt.includes('enter') && !txt.includes('Drop') && !txt.includes('click here')) {
+                        return true;
+                    }
+                }
+            }
             return false;
         }
 
@@ -2076,9 +2239,9 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 pasteArea.value = '';
                 
                 if (file.type === "application/pdf" || file.name.toLowerCase().endsWith('.pdf')) {
-                    // PAE drop: only ask to replace if invoice already has meaningful data
-                    if (invoiceHasData()) {
-                        const confirmed = await showConfirmModal("Replace current invoice with this PAE? All existing entries will be cleared.");
+                    // PAE drop: only ask to replace if PAE info already exists
+                    if (hasPaeInfo()) {
+                        const confirmed = await showConfirmModal("Replace current PAE information with this new PAE? All existing PAE fields will be updated.");
                         if (!confirmed) return;
                     }
                     handlePdfFile(file);
