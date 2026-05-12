@@ -133,7 +133,7 @@
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="active-model-display"></span>
                 <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
-                <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: 36c1aea</span>
+                <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: 10bfb7a</span>
             </div>
         </div>
         <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
@@ -325,7 +325,8 @@
             </div>
             <div class="vendor-info">
                 <strong>Vendor #:</strong> <span style="color: red;">3664110013-000</span><br>
-                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                <span id="field-pae-expiration" style="display:none"></span><br>
                 <strong>Est. Trav Costs:</strong> <span id="field-trav-costs" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
@@ -705,7 +706,8 @@
                 'auth-serv': /Auth(?:orized)?\s*Serv(?:ice)?\s*Amount\s*(?:Not\s*to\s*Exceed)?\s*:\s*([\$0-9,.]+)/i,
                 'auth-hours': /(?:Auth(?:orized)?\s*(?:Hours|Hrs)|Maximum\s*Quantity)\s*:?\s*([\d,.]+)/i,
                 'total-auth': /Total\s*Auth(?:orized)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
-                'pae-date': /(?:Effective|Processed)\s*Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
+                'pae-date': /(?:Effective|Processed)\s*Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                'pae-expiration': /(?:Expir(?:ation)?|Valid(?:ity)?\s*(?:Until|Thru|Through))\s*Date\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
             };
 
             let found = false;
@@ -752,7 +754,7 @@
             // Save header fields
             const headerFields = [
                 'field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth',
-                'field-client', 'field-case', 'field-attorney', 'field-pae',
+                'field-client', 'field-case', 'field-attorney', 'field-pae', 'field-pae-expiration',
                 'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range',
                 'field-grand-total'
             ];
@@ -951,12 +953,13 @@ VALIDATION CHECKS:
 1. Rate Errors: Check each service hour entry. If date < Aug 1 2025, rate should be $55/hr. If date >= Aug 1 2025, rate should be $59/hr. Flag mismatches.
 2. Duplicate Entries: Flag rows with identical date, category, description, and hours.
 3. Required Fields Missing: Client, Case #, Attorney, PAE #, Investigator, Invoice #, Invoice Date must be filled (not placeholder).
-4. Date Logic: Invoice Date should be on or after the latest service date. If PAE info is present, service dates should not be before the PAE effective date.
+4. Date Logic: Invoice Date should be on or after the latest service date. If PAE info is present (effective and expiration dates), service dates must fall within that range. Flag entries outside the PAE date window.
 5. Totals Integrity: Compute grand total from all line items (hours, mileage, expenses). Compare to displayed TOTAL. Flag if different.
 6. Authorization Exceeded: If 'Auth Hours' is set, check if total hours billed > authorized. Flag overage.
 7. Mileage Plausibility: Flag any single mileage entry > 200 miles as potentially unusual.
 8. Copy Counts: B&W and Color copy quantities should be represented as line items in expenses; if missing quantities, flag.
 9. Empty Descriptions: Any service hour entry with blank or missing description should be flagged.
+10. Travel Leg Completeness: For Investigator Service entries on a given date, verify that both an outbound and return travel leg (with mileage and travel time) exist for the same date unless the description indicates out-of-town or multi-day travel. Flag incomplete trips.
 
 OUTPUT FORMAT (exactly):
 === VALIDATION REPORT ===
