@@ -753,7 +753,7 @@
                 'auth-serv': /Auth(?:orized)?\s*Serv(?:ice)?\s*Amount\s*(?:Not\s*to\s*Exceed)?\s*:\s*([\$0-9,.]+)/i,
                 'auth-hours': /(?:Auth(?:orized)?\s*(?:Hours|Hrs)|Maximum\s*Quantity)\s*:?\s*([\d,.]+)/i,
                 'total-auth': /Total\s*Auth(?:orized)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
-                'pae-date': /(?:Effective|Processed)\s*Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                'pae-effective': /(?:Effective)\s*Date\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
                 'pae-expiration': /(?:Expir(?:ation|es)?|Valid(?:ity)?\s*(?:Until|Thru|Through))\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
             };
 
@@ -768,7 +768,7 @@
                         targetId = 'field-pae';
                         const headerPae = document.getElementById('field-pae-header');
                         if (headerPae) headerPae.textContent = val;
-                    } else if (key === 'pae-date') {
+                    } else if (key === 'pae-effective') {
                         const paeDate = new Date(val);
                         const noteEl = document.getElementById('pae-date-note');
                         if (noteEl && !isNaN(paeDate.getTime())) {
