@@ -964,7 +964,7 @@
 VALIDATION CHECKS:
 1. Rate Errors: For each service hour entry, check if its date falls before or after Aug 1 2025 and verify the rate matches the expected rate for that date period. Flag mismatches only. If no entries exist for a given period, that's fine — don't warn.
 2. Duplicate Entries: Flag rows with identical date, category, description, and hours.
-3. PAE Drop Information: If PAE was dropped/imported, verify all required PAE fields are populated: PAE Header (project name), PAE #, PAE Expiration, Estimated Trav Costs, Auth Serv Amount, Auth Hours, Total Auth. If any are missing or placeholder, report "PAE drop information incomplete."
+3. PAE Drop Information: If PAE was dropped/imported (field-pae-header is non-empty), verify all required PAE fields are populated (PAE #, PAE Expiration, Estimated Trav Costs, Auth Serv Amount, Auth Hours, Total Auth). If any are missing or still placeholder, report "PAE information incomplete — all PAE fields must be filled."
 4. Missing Investigator: field-investigator must be filled (not placeholder).
 5. Missing Invoice Number: field-invoice-num must be filled.
 6. Missing Invoice Date: field-invoice-date must be filled.
