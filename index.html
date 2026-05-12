@@ -734,7 +734,7 @@
             totalRows[4].cells[5].textContent = '$' + totalExpenses.toFixed(2);
 
             const grandTotal = (totalHours55 * CONFIG.RATE_EARLY) + (totalHours59 * CONFIG.RATE_LATE) +
-                               miles2025Amt + miles2026Amt + totalExpenses;
+                               (totalMiles2025 * CONFIG.MILEAGE_2025) + (totalMiles2026 * CONFIG.MILEAGE_2026) + totalExpenses;
             totalRows[5].cells[0].textContent = '';
             totalRows[5].cells[1].textContent = '';
             totalRows[5].cells[2].textContent = '';
