@@ -781,6 +781,8 @@
                 return;
             }
 
+            const apiKey = CONFIG.AI_API_KEY.trim();
+
             const state = getInvoiceState();
             const resultsDiv = document.getElementById('ai-results');
             resultsDiv.style.display = 'block';
@@ -797,7 +799,7 @@
                 const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, ''); // Clean trailing slash
 
                 if (model.startsWith('gemini')) {
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CONFIG.AI_API_KEY}`;
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
                     body = JSON.stringify({ 
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: { temperature, maxOutputTokens: max_tokens },
@@ -810,7 +812,7 @@
                     });
                 } else if (model.startsWith('claude')) {
                     url = 'https://api.anthropic.com/v1/messages';
-                    headers['x-api-key'] = CONFIG.AI_API_KEY;
+                    headers['x-api-key'] = apiKey;
                     headers['anthropic-version'] = '2023-06-01';
                     body = JSON.stringify({ model, max_tokens, temperature, messages: [{ role: 'user', content: prompt }] });
                 } else {
@@ -834,7 +836,7 @@
                         return;
                     }
 
-                    headers['Authorization'] = `Bearer ${CONFIG.AI_API_KEY}`;
+                    headers['Authorization'] = `Bearer ${apiKey}`;
                     body = JSON.stringify({ 
                         model: model === 'custom' ? 'default' : model, 
                         messages: [{ role: 'user', content: prompt }],
