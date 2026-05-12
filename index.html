@@ -959,8 +959,13 @@ VALIDATION CHECKS:
 6. Authorization Exceeded: If 'Auth Hours' is set, check if total hours billed > authorized. Flag overage.
 7. Mileage Plausibility: Flag any single mileage entry > 200 miles as potentially unusual.
 8. Copy Counts: B&W and Color copy quantities should be represented as line items in expenses; if missing quantities, flag.
-9. Empty Descriptions: Any service hour entry with blank or missing description should be flagged.
-10. Travel Leg Completeness: For Investigator Service entries on a given date, verify that both an outbound and return travel leg (with mileage and travel time) exist for the same date unless the description indicates out-of-town or multi-day travel. Flag incomplete trips.
+9. Descriptions: Any service hour entry with blank or missing description should be flagged.
+10. Travel Leg Completeness: For each date with Investigator Service, examine all mileage entries (routes with miles). The travel should form a complete trip: either a simple round-trip (Location A → Location B and B → A), or a multi-stop itinerary that returns to origin or connects logically. Flag dates where:
+   - Only one leg is present (outbound without corresponding return, or return without outbound)
+   - Routes don't connect (e.g., A → B but return is C → A without B → C linking them)
+   - Intermediate stops create dead-ends (e.g., A → B → C but no leg from C onward)
+   - Total mileage suspiciously low for the number of legs, unless description clearly indicates local/one-way travel.
+11. OOP per Leg: For each mileage leg on a given date, there should be an Out-of-Pocket expense entry to cover tolls/parking (unless the MI category or description explicitly indicates "Admin Time", "Local File Review", or other no-travel contexts). Flag mileage legs lacking a corresponding OOP item for that date and leg route (by approximate location match).
 
 OUTPUT FORMAT (exactly):
 === VALIDATION REPORT ===
