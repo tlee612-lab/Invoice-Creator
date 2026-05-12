@@ -1270,7 +1270,11 @@
 
             let extractedNames = [];
             try {
-                const { model, apiKey } = CONFIG;
+                const { model = '', apiKey = '' } = CONFIG;
+                if (!apiKey || !model) {
+                    alert("AI not configured. Set API key and model in Settings.");
+                    return;
+                }
                 let url, headers = { 'Content-Type': 'application/json' }, body;
 
                 if (model.startsWith('gemini')) {
