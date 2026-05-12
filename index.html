@@ -1547,8 +1547,14 @@ If no issues: "No validation issues detected."`;
                 // Attach listeners directly to this row's controls
                 const sel = row.querySelector('select');
                 const num = row.querySelector('input');
-                sel.addEventListener('change', updatePreview);
-                num.addEventListener('input', updatePreview);
+                sel.addEventListener('change', () => {
+                    assignments[idx].label = sel.value;
+                    updatePreview();
+                });
+                num.addEventListener('input', () => {
+                    assignments[idx].customNum = parseInt(num.value) || null;
+                    updatePreview();
+                });
             });
 
             function updatePreview() {
