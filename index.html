@@ -1286,7 +1286,8 @@
 
             let extractedNames = [];
             try {
-                const { model = '', apiKey = '' } = CONFIG;
+                const model = CONFIG.AI_MODEL || '';
+                const apiKey = CONFIG.AI_API_KEY || '';
                 if (!apiKey || !model) {
                     alert("AI not configured. Set API key and model in Settings.");
                     return;
