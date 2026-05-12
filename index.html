@@ -753,8 +753,8 @@
                 'auth-serv': /Auth(?:orized)?\s*Serv(?:ice)?\s*Amount\s*(?:Not\s*to\s*Exceed)?\s*:\s*([\$0-9,.]+)/i,
                 'auth-hours': /(?:Auth(?:orized)?\s*(?:Hours|Hrs)|Maximum\s*Quantity)\s*:?\s*([\d,.]+)/i,
                 'total-auth': /Total\s*Auth(?:orized)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
-                'pae-effective': /(?:Effective)\s*(?:Date)?\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
-                'pae-expiration': /(?:Expir(?:ation|es|y)?|Exp\b|Valid(?:ity)?)\s*(?:Date)?\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
+                'pae-effective': /Effective\s+Date\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                'pae-expiration': /Expir(?:ation|es|y)?\s+Date\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
             };
 
             let found = false;
