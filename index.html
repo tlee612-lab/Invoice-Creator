@@ -994,6 +994,12 @@
 
             const validationPrompt = `You are an invoice validation assistant for a legal investigation firm. Review the provided invoice data and produce a structured validation report.
 
+BILLING RATES (use these for totals computation):
+- Pre-2025-08-01 service hours: $55.00/hour
+- Post-2025-08-01 service hours: $59.00/hour
+- 2025 mileage: $0.70/mile
+- 2026 mileage: $0.725/mile
+
 VALIDATION CHECKS:
 1. Rate Errors: For each service hour entry, check if its date falls before or after Aug 1, 2025 and verify the rate matches the expected rate for that date period. If mismatches found, list each with date, case #, expected vs actual rate. If no entries exist for a period, just say "No rate errors detected." If no service hours at all, say "No service hours to validate."
 
@@ -1024,7 +1030,7 @@ VALIDATION CHECKS:
 
 11. OOP per Leg: For each mileage leg on a given date, check for a matching Out-of-Pocket expense (tolls/parking). If leg lacks OOP and description doesn't indicate no-travel context (e.g., "Admin Time", "Local File Review"), flag by date and route. If all legs covered or no mileage legs, say "OOP expenses tracked for all travel legs."
 
-12. Totals Integrity: First, check whether the invoice data explicitly includes an hourly billing rate and a mileage reimbursement rate. If these rates are NOT present (e.g., only totals appear without per-unit rates), then output: "Totals integrity cannot be verified — hourly and/or mileage rates not specified; manual reconciliation required." If rates ARE present, compute the grand total from all line items (hours × hourly rate, mileage × mileage rate, expenses subtotal) and compare to the displayed TOTAL. If they match, say "Totals integrity verified." If different, state: "Totals mismatch: computed $X.XX vs displayed $Y.YY."
+12. Totals Integrity: Using the hourly and mileage rates provided above, compute the grand total from all line items (sum of: hours in each period × appropriate rate, miles in each year × appropriate rate, expenses subtotal). Compare your computed total to the displayed TOTAL field. If they match, say "Totals integrity verified." If different, state: "Totals mismatch: computed $X.XX vs displayed $Y.YY."
 
 OUTPUT FORMAT (exactly):
 === VALIDATION REPORT ===
