@@ -335,13 +335,13 @@
             </div>
             <div class="vendor-info">
                 <strong>Vendor #:</strong> <span style="color: red;">3664110013-000</span><br>
-                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
-                <span id="field-pae-expiration" style="display:none"></span><br>
+                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Est. Trav Costs:</strong> <span id="field-trav-costs" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                 <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since pae was produced</div>
+                <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since PAE was produced</div>
+                <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since PAE was produced</div>
             </div>
         </div>
         <div class="top-section">
@@ -352,6 +352,7 @@
                     <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                     <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                     <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>PAE Eff:</strong> <span id="field-pae-effective" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                     <strong>PAE Exp:</strong> <span id="field-pae-expiration" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
                 </div>
             </div>
@@ -771,11 +772,19 @@
                         if (noteEl && !isNaN(paeDate.getTime())) {
                             noteEl.style.display = paeDate < CONFIG.RATE_CUTOFF_DATE ? 'block' : 'none';
                         }
+                        // Store effective date in dedicated field
+                        const effectiveEl = document.getElementById('field-pae-effective');
+                        if (effectiveEl) effectiveEl.textContent = val;
                         // Auto-fill Invoice Date if it's currently a placeholder
                         const invDateEl = document.getElementById('field-invoice-date');
                         if (invDateEl && (invDateEl.textContent.trim() === "" || invDateEl.textContent.includes("enter"))) {
                             invDateEl.textContent = val;
                         }
+                        found = true;
+                        return;
+                    } else if (key === 'pae-expiration') {
+                        const expEl = document.getElementById('field-pae-expiration');
+                        if (expEl) expEl.textContent = val;
                         found = true;
                         return;
                     } else {
@@ -798,7 +807,7 @@
             // Save header fields
             const headerFields = [
                 'field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth',
-                'field-client', 'field-case', 'field-attorney', 'field-pae', 'field-pae-expiration',
+                'field-client', 'field-case', 'field-attorney', 'field-pae', 'field-pae-effective', 'field-pae-expiration',
                 'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range',
                 'field-grand-total'
             ];
@@ -1937,7 +1946,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
         async function handlePdfFile(file) {
             try {
                 // Clear previous PAE-related fields
-                const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae', 'field-pae-expiration'];
+                const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae', 'field-pae-effective', 'field-pae-expiration'];
                 paeFields.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.textContent = '';
