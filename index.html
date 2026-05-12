@@ -962,26 +962,30 @@
             const validationPrompt = `You are an invoice validation assistant for a legal investigation firm. Review the provided invoice data and produce a structured validation report.
 
 VALIDATION CHECKS:
-1. Rate Errors: For each service hour entry, check if its date falls before or after Aug 1 2025 and verify the rate matches the expected rate for that date period. Flag mismatches only. If no entries exist for a given period, that's fine — don't warn.
+1. Rate Errors: For each service hour entry, check if its date falls before or after Aug 1, 2025 and verify the rate matches the expected rate for that date period. Flag mismatches only. If no entries exist for a given period, that's fine — don't warn.
 2. Duplicate Entries: Flag rows with identical date, category, description, and hours.
-3. PAE Drop Information: If PAE was dropped/imported (field-pae-header is non-empty), verify all required PAE fields are populated (PAE #, PAE Expiration, Estimated Trav Costs, Auth Serv Amount, Auth Hours, Total Auth). If any are missing or still placeholder, report "PAE information incomplete — all PAE fields must be filled."
-4. Missing Investigator: field-investigator must be filled (not placeholder).
-5. Missing Invoice Number: field-invoice-num must be filled.
-6. Missing Invoice Date: field-invoice-date must be filled.
-7. Missing Client Details: Client, Case #, and Attorney must all be filled; flag each missing field individually.
-8. Date Logic: Invoice Date should be on or after the latest service date. If PAE info is present (effective and expiration dates), service dates must fall within that range. Flag entries outside the PAE date window.
-9. Totals Integrity: Compute grand total from all line items (hours, mileage, expenses). Compare to displayed TOTAL. Flag if different.
-10. Authorization Exceeded: If 'Auth Hours' is set, check if total hours billed > authorized. Flag overage.
-11. Mileage Plausibility: If mileage entries exist, flag any single entry > 200 miles as potentially unusual. If no mileage entries, skip this check — no warning.
-12. Copy Counts: B&W and Color copy quantities should be represented as line items in expenses; if missing quantities, flag.
-13. Empty Descriptions: Any service hour entry with blank or missing description should be flagged.
-14. Travel Sequence: For each date with Investigator Service, verify that the trip follows the expected pattern. If no mileage entries exist on that date, skip. Otherwise:
+3. PAE Drop Information: If PAE was dropped/imported (field-pae-header is non-empty), verify all required PAE fields are populated (PAE #, PAE Expiration, Estimated Trav Costs, Auth Serv Amount, Auth Hours, Total Auth). If any are missing or still placeholder, report: "PAE information incomplete — all PAE fields must be filled."
+4. Missing Fields: Check all required header fields. Report all missing items in a single bulleted list:
+   - Investigator (field-investigator)
+   - Invoice Number (field-invoice-num)
+   - Invoice Date (field-invoice-date)
+   - Client (field-client)
+   - Case # (field-case)
+   - Attorney (field-attorney)
+   Flag each field that is empty, placeholder, or clearly not filled (e.g., contains "click here to enter", "Drop PAE or click to enter", "Intake", etc.).
+5. Date Logic: Invoice Date should be on or after the latest service date. If PAE info is present (effective and expiration dates), service dates must fall within that range. Flag entries outside the PAE date window. Also flag any service entry that falls outside the stated billing date range if one is provided (e.g., "Date Range: MM/DD–MM/DD").
+6. Totals Integrity: Compute grand total from all line items (hours, mileage, expenses). Compare to displayed TOTAL. Flag if different, and explicitly state what the computed total is vs what's displayed.
+7. Authorization Exceeded: If 'Auth Hours' is set, check if total hours billed > authorized. Flag overage and state the overage amount.
+8. Mileage Plausibility: If mileage entries exist, flag any single entry > 200 miles as potentially unusual. If no mileage entries, skip this check — no warning.
+9. Copy Counts: Verify B&W and Color copy quantities are present as line items in expenses with correct computed amounts ($0.10 per B&W, $0.50 per color). If missing or mismatched, flag.
+10. Empty Descriptions: Any service hour entry with blank or missing description should be flagged.
+11. Travel Sequence: For each date with Investigator Service, verify that the trip follows the expected pattern. If no mileage entries exist on that date, skip. Otherwise:
     - Outbound travel leg (miles + travel time hours) → Service event (work) → Return travel leg (miles + travel time hours).
     - If multiple service events on same date (multi-stop), each should be bracketed by travel legs: Leg1 → Service1 → Leg2 → Service2 → ... → Return.
     - Every travel leg should include both a mileage entry and a corresponding Investigator Service entry with travel time hours.
     - Each leg should have a matching OOP expense (tolls/parking), unless description explicitly excludes travel costs.
     Flag missing legs, missing service descriptions between travel, orphaned mileage/hours without paired items, or incomplete sequences.
-15. OOP per Leg: For each mileage leg on a given date, there should be an Out-of-Pocket expense entry to cover tolls/parking (unless the description explicitly indicates "Admin Time", "Local File Review", or other no-travel contexts). Flag mileage legs lacking a corresponding OOP item for that date and leg route (by approximate location match). If no mileage legs exist on that date, skip this check.
+12. OOP per Leg: For each mileage leg on a given date, there should be an Out-of-Pocket expense entry to cover tolls/parking (unless the description explicitly indicates "Admin Time", "Local File Review", or other no-travel contexts). Flag mileage legs lacking a corresponding OOP item for that date and leg route (by approximate location match). If no mileage legs exist on that date, skip this check.
 
 OUTPUT FORMAT (exactly):
 === VALIDATION REPORT ===
