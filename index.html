@@ -49,9 +49,28 @@
         .settings-field { margin-bottom: 20px; }
         .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--text); font-weight: 700; }
         .input-group { display: flex; gap: 5px; }
-        .settings-field input, .settings-field select, .settings-field textarea { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; background: var(--surface2); color: var(--text); font-family: 'Barlow', sans-serif; font-weight: 500; outline: none; transition: border-color 0.2s; }
-        .settings-field input:focus, .settings-field select:focus, .settings-field textarea:focus { border-color: var(--accent); }
-        .settings-field input:read-only, .settings-field select:disabled, .settings-field textarea:read-only { background: var(--surface); color: var(--muted); cursor: not-allowed; font-weight: 400; }
+        .settings-field input, .settings-field select, .settings-field textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border) !important;
+            border-radius: 4px;
+            font-size: 14px;
+            background: var(--surface2) !important;
+            color: var(--text) !important;
+            font-family: 'Barlow', sans-serif;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .settings-field input:focus, .settings-field select:focus, .settings-field textarea:focus {
+            border-color: var(--accent) !important;
+        }
+        .settings-field input:read-only, .settings-field select:disabled, .settings-field textarea:read-only {
+            background: var(--surface) !important;
+            color: var(--muted) !important;
+            cursor: not-allowed;
+            font-weight: 400;
+        }
         .settings-field input::placeholder, .settings-field textarea::placeholder { color: var(--muted); opacity: 0.7; }
         .btn-icon { background: var(--surface2); border: 1px solid var(--border); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; color: var(--text); }
         .btn-icon:hover { background: var(--surface); border-color: var(--accent); }
