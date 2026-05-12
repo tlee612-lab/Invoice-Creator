@@ -1548,8 +1548,6 @@ If no issues: "No validation issues detected."`;
                 // Attach listeners directly to this row's controls
                 const sel = row.querySelector('select');
                 const num = row.querySelector('input');
-                sel.dataset.idx = idx;
-                num.dataset.idx = idx;
                 sel.addEventListener('change', () => {
                     const i = parseInt(sel.dataset.idx);
                     assignments[i].label = sel.value;
@@ -1562,14 +1560,7 @@ If no issues: "No validation issues detected."`;
                     updatePreview();
                 });
             });
-                num.addEventListener('input', () => {
-                    const i = parseInt(num.dataset.idx);
-                    const val = parseInt(num.value);
-                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
-                    updatePreview();
-                });
-            });
-            });
+
 
             function updatePreview() {
                 const previewEl = modal.querySelector('#preview-list');
