@@ -144,7 +144,7 @@
             <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
             <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
             <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
-            <button id="btn-ai" onclick="analyzeInvoiceAI()" title="AI analysis of invoice" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
+            <button id="btn-ai" onclick="openAiMenu()" title="AI tools" style="padding: 6px 8px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🤖 AI</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="display:none">
             <input type="file" id="json-input" accept=".json" style="display:none">
@@ -292,6 +292,20 @@
             <div class="modal-actions">
                 <button onclick="closeSettings()" style="padding: 8px 16px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px;">Close</button>
                 <button onclick="saveSettings()" style="padding: 8px 16px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px;">Save Settings</button>
+            </div>
+        </div>
+    </div> <!-- end settings-modal -->
+
+    <!-- AI Tools Menu Modal -->
+    <div id="ai-menu-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 400px; padding: 24px;">
+            <div class="modal-header">
+                <span>AI Tools</span>
+                <button class="btn-close" onclick="closeAiMenu()">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                <button onclick="closeAiMenu(); analyzeInvoiceAI();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: var(--bg); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">📊 Analyze Invoice Data</button>
+                <button onclick="closeAiMenu(); convertNamesToCodes();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">🏷️ Convert Names to Codes</button>
             </div>
         </div>
     </div>
@@ -790,6 +804,13 @@
             }
         }
 
+        function openAiMenu() {
+            document.getElementById('ai-menu-modal').style.display = 'flex';
+        }
+        function closeAiMenu() {
+            document.getElementById('ai-menu-modal').style.display = 'none';
+        }
+
         async function analyzeInvoiceAI() {
             const btn = document.getElementById('btn-ai');
             if (btn && btn.disabled) {
@@ -1261,6 +1282,44 @@
             delete NAME_CODES[key];
             saveNameCodes();
             renderNameCodesList();
+        }
+
+        function convertNamesToCodes() {
+            const clientEl = document.getElementById('field-client');
+            const investEl = document.getElementById('field-investigator');
+            
+            const clientText = clientEl ? clientEl.textContent.trim() : '';
+            const investText = investEl ? investEl.textContent.trim() : '';
+            
+            const placeholders = ['Drop PAE or click to enter', 'click here to enter', ''];
+            
+            let changed = false;
+            let msg = 'Name conversion complete:\n';
+            
+            if (clientText && !placeholders.includes(clientText)) {
+                const code = getCode(clientText, 'client');
+                clientEl.textContent = code;
+                clientEl.classList.remove('placeholder-bg');
+                msg += `\nClient: "${clientText}" → ${code}`;
+                changed = true;
+            }
+            
+            if (investText && !placeholders.includes(investText)) {
+                const code = getCode(investText, 'investigator');
+                investEl.textContent = code;
+                investEl.classList.remove('placeholder-bg');
+                msg += `\nInvestigator: "${investText}" → ${code}`;
+                changed = true;
+            }
+            
+            if (!changed) {
+                alert("No valid names found to convert. Ensure client and investigator fields are filled.");
+                return;
+            }
+            
+            saveNameCodes();
+            saveInvoiceData();
+            alert(msg);
         }
 
         // Call on Settings open and on page load to populate list
