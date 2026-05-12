@@ -341,7 +341,8 @@
                     <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                     <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
                     <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
-                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>PAE Exp:</strong> <span id="field-pae-expiration" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
                 </div>
             </div>
             <div class="invoice-details">
@@ -1864,7 +1865,7 @@ If no issues: "No validation issues detected."`;
         async function handlePdfFile(file) {
             try {
                 // Clear previous PAE-related fields
-                const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae'];
+                const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae', 'field-pae-expiration'];
                 paeFields.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.textContent = '';
