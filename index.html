@@ -783,12 +783,12 @@
                             invDateEl.textContent = val;
                         }
                         found = true;
-                        return;
+                        // continue to other patterns
                     } else if (key === 'pae-expiration') {
                         const expEl = document.getElementById('field-pae-expiration');
                         if (expEl) expEl.textContent = val;
                         found = true;
-                        return;
+                        // continue to other patterns
                     } else {
                         targetId = `field-${key}`;
                     }
