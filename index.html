@@ -1562,9 +1562,12 @@ If no issues: "No validation issues detected."`;
                 });
             });
                 num.addEventListener('input', () => {
-                    assignments[idx].customNum = parseInt(num.value) || null;
+                    const i = parseInt(num.dataset.idx);
+                    const val = parseInt(num.value);
+                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
                     updatePreview();
                 });
+            });
             });
 
             function updatePreview() {
