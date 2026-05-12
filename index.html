@@ -141,25 +141,106 @@
                 <div class="instructions" style="font-size: 10px;">Endpoint for syncing invoice data to Google Sheets.</div>
             </div>
 
-            <div id="tab-codes" class="tab-content">
-                <div class="settings-field">
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <label style="margin-bottom: 0;">Name to Code Mapping</label>
-                        <button onclick="addNameCodeRow()" style="padding: 4px 8px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; font-size: 11px;">+ Add</button>
-                    </div>
-                    <div id="name-codes-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px;">
-                        <!-- Name code rows inserted here -->
-                    </div>
-                </div>
-                <div class="instructions" style="font-size: 10px;">Client and investigator names will be replaced with codes on import.</div>
-             </div>
-
             <div id="tab-ai" class="tab-content">
                 <div class="settings-field">
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
                         <label style="margin-bottom: 0;">AI Provider & Model</label>
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
                     </div>
+                    <div class="input-group">
+                        <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5;">
+                            <optgroup label="Google Gemini">
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </optgroup>
+                            <optgroup label="OpenAI ChatGPT">
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                            </optgroup>
+                            <optgroup label="Anthropic Claude">
+                                <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                                <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
+                                <option value="claude-3-opus-latest">Claude 3 Opus</option>
+                                <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                                <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                            </optgroup>
+                            <optgroup label="xAI Grok">
+                                <option value="grok-beta">Grok Beta</option>
+                            </optgroup>
+                            <optgroup label="DeepSeek">
+                                <option value="deepseek-chat">DeepSeek Chat</option>
+                                <option value="deepseek-coder">DeepSeek Coder</option>
+                            </optgroup>
+                            <optgroup label="Perplexity">
+                                <option value="llama-3.1-sonar-large-128k-online">Sonar Large Online</option>
+                            </optgroup>
+                            <optgroup label="Custom / Local (OpenAI Compatible)">
+                                <option value="custom">Custom Endpoint</option>
+                            </optgroup>
+                        </select>
+                        <button class="btn-icon" id="lock-ai-model" onclick="toggleField('setting-ai-model', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">AI API Key</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="setting-ai-key" placeholder="Enter your API Key" readonly>
+                        <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">👁️</button>
+                        <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-test" onclick="testAI()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
+                    </div>
+                </div>
+
+                <div class="settings-field" id="group-ai-base-url" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">API Base URL (e.g., http://localhost:11434/v1)</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="setting-ai-base-url" placeholder="https://api.openai.com/v1" readonly>
+                        <button class="btn-icon" id="lock-ai-base-url" onclick="toggleField('setting-ai-base-url', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span></label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="range" id="setting-ai-temp" min="0" max="2" step="0.1" value="0.7" disabled oninput="document.getElementById('val-ai-temp').textContent=this.value">
+                        <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">Max Tokens</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="setting-ai-tokens" placeholder="2048" disabled>
+                        <button class="btn-icon" id="lock-ai-tokens" onclick="toggleField('setting-ai-tokens', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">System Instructions (Analysis Prompt)</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <textarea id="setting-ai-instructions" rows="3" readonly style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5; resize: vertical;"></textarea>
+                        <button class="btn-icon" id="lock-ai-instructions" onclick="toggleField('setting-ai-instructions', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="instructions" style="font-size: 10px;">Configure your AI provider and parameters for invoice auditing.</div>
+            </div>
                     <div class="input-group">
                         <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: #f5f5f5;">
                             <optgroup label="Google Gemini">
