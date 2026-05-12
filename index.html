@@ -1,4 +1,998 @@
-             const validationPrompt = `You are an invoice validation assistant for a legal investigation firm. Review the provided invoice data and produce a structured validation report.
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+    "name": "Invoice Preview",
+    "schemaVersion": 1,
+     "description": "Invoice creator web app"
+}
+</script>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <title>Invoice Creator</title>
+    <style>
+        :root {
+          --bg: #0d0f14;
+          --surface: #141720;
+          --surface2: #1c2030;
+          --border: #0090ff;
+          --accent: #00c8a0;
+          --accent2: #0090ff;
+          --text: #e8eef8;
+          --muted: #8a96ac;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; }
+        
+        /* App Controls */
+        #import-zone { max-width: 950px; margin: 0 auto 20px auto; background: var(--surface); padding: 20px; border-radius: 8px; border: 2px dashed var(--border); }
+        #import-zone h3 { margin-bottom: 2px; font-size: 16px; color: var(--border); }
+        #active-model-display { font-size: 12px; color: var(--accent); font-weight: bold; margin-right: 8px; }
+        .instructions { font-size: 11px; color: var(--muted); margin-top: 5px; }
+        #paste-area { width: 100%; height: 120px; padding: 12px; border: 2px dashed var(--border); border-radius: 6px; resize: vertical; font-size: 15px; background: var(--surface2); color: var(--text); }
+        #paste-area:focus { outline: none; border-color: var(--accent); border-style: solid; box-shadow: 0 0 0 3px rgba(0,200,160,0.15); }
+        #paste-area:hover { border-color: var(--accent); }
+        #ai-results { margin-top: 15px; padding: 12px; background: var(--surface); border-left: 4px solid var(--border); border-radius: 4px; display: none; font-size: 13px; line-height: 1.5; color: var(--text); }
+        .ai-loading { color: var(--border); font-style: italic; }
+        /* Settings Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: var(--surface); padding: 30px; border-radius: 8px; width: 900px; max-width: 95vw; min-width: 600px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 15px; color: var(--text); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); resize: both; overflow: auto; }
+        .modal-header { cursor: move; user-select: none; }
+        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 15px; }
+        .modal-tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: var(--muted); transition: all 0.2s; }
+        .modal-tab:hover { color: var(--accent); }
+        .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+        .tab-content { display: none; min-height: 120px; }
+        .tab-content.active { display: block; }
+        .settings-field { margin-bottom: 20px; }
+        .settings-field label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--text); font-weight: 700; }
+        .input-group { display: flex; gap: 5px; }
+        .settings-field input, .settings-field select, .settings-field textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border) !important;
+            border-radius: 4px;
+            font-size: 14px;
+            background: var(--surface2) !important;
+            color: var(--text) !important;
+            font-family: 'Barlow', sans-serif;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .settings-field input:focus, .settings-field select:focus, .settings-field textarea:focus {
+            border-color: var(--accent) !important;
+        }
+        .settings-field input:read-only, .settings-field select:disabled, .settings-field textarea:read-only {
+            background: var(--surface) !important;
+            color: var(--muted) !important;
+            cursor: not-allowed;
+            font-weight: 400;
+        }
+        .settings-field input::placeholder, .settings-field textarea::placeholder { color: var(--muted); opacity: 0.7; }
+        .btn-icon { background: var(--surface2); border: 1px solid var(--border); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: all 0.2s; color: var(--text); }
+        .btn-icon:hover { background: var(--surface); border-color: var(--accent); }
+        .btn-test { background: var(--accent); color: var(--bg); border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-test:hover { background: var(--accent2); color: var(--bg); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); }
+        .btn-close:hover { color: var(--text); }
+        /* Drop area button hover effect */
+        #import-zone button:hover { background: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }
+
+        .invoice-container { max-width: 950px; margin: 0 auto; background: var(--surface); padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: var(--text); }
+        @media print { #import-zone, #ai-results, .modal-overlay { display: none !important; } body { padding: 0; background: white; } .invoice-container { box-shadow: none; padding: 0; background: white; color: black; } }
+
+        .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); gap: 20px; }
+        .vendor-info { margin-left: auto; margin-right: 80px; text-align: left; font-size: 12px; color: var(--muted); white-space: normal; line-height: 1.6; }
+        .vendor-info span[contenteditable] { display: inline; min-width: 0; padding: 2px 4px; margin: 0; }
+        .header img { height: 80px; width: 80px; flex-shrink: 0; }
+        [contenteditable="true"] { cursor: text; padding: 4px 6px; border-radius: 4px; transition: all 0.2s; background: var(--surface); color: var(--text); border: 1px solid transparent; }
+        [contenteditable="true"]:hover { background: var(--surface2); border-color: var(--surface2); }
+        [contenteditable="true"]:focus { background: var(--surface2); border-color: var(--surface2); outline: none; }
+        .placeholder-bg { background-color: var(--surface) !important; color: var(--muted) !important; }
+        .placeholder-bg:focus { background-color: var(--surface2) !important; color: var(--muted) !important; }
+        .company-info h1 { font-size: 24px; margin-bottom: 5px; color: var(--text); }
+        .company-details { font-size: 12px; color: var(--muted); line-height: 1.5; }
+        .top-section { display: flex; gap: 40px; margin-bottom: 5px; }
+        .client-section, .invoice-details { flex: 1; }
+        .section-title { font-size: 12px; font-weight: bold; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+        .client-info { font-size: 12px; color: var(--text); line-height: 1.6; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; }
+        .section-heading { font-size: 13px; font-weight: bold; background: var(--surface2); padding: 8px 8px 4px 8px; margin-top: 5px; margin-bottom: 0; color: var(--text); }
+        table thead { background: var(--surface2); }
+        table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--text); }
+        table td { padding: 6px; border-bottom: 1px solid var(--border); white-space: nowrap; color: var(--text); }
+        table tr.case-header td { background: var(--surface); font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+        table tr.subtotal td { background: var(--surface2); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding-top: 6px; padding-bottom: 6px; color: var(--text); }
+        table tr.grand-total td { background: var(--surface2); color: var(--accent); font-weight: bold; border-top: 2px solid var(--accent); padding: 8px 6px; }
+        .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
+        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid var(--accent); }
+        .blue-text { color: var(--border); }
+        .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border); }
+        .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 12px; }
+        .total-item { display: flex; justify-content: space-between; padding: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+        #import-zone textarea + div button {
+            width: 100% !important;
+            min-width: 0 !important;
+            padding: 6px 8px !important;
+            box-sizing: border-box !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="import-zone">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 16px; color: var(--border);">Data Import</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="active-model-display"></span>
+                <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
+                <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: d49d107</span>
+            </div>
+        </div>
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste table data, drop a PDF for PAE info, or paste a TLI Field Log (16 cols).</div>
+        <textarea id="paste-area" placeholder="Paste spreadsheet data here (or drop a CSV file)..."></textarea>
+        <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
+            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Scan PDF</button>
+            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
+            <button onclick="window.print()" title="Print invoice" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
+            <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
+            <button onclick="document.getElementById('json-input').click()" title="Import invoice from JSON" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 Import</button>
+            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
+            <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Convert Names</button>
+            <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">✅ Validate</button>
+        </div>
+            <input type="file" id="pdf-input" accept=".pdf" style="display:none">
+            <input type="file" id="json-input" accept=".json" style="display:none">
+            <span id="save-indicator">✔ Saved to Browser</span>
+        </div>
+    </div>
+
+    <!-- Validation Results Modal -->
+    <div id="validation-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content" style="max-width:800px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <div style="font-family:var(--ui);font-weight:800;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text)">Invoice Validation Report</div>
+                <button onclick="document.getElementById('validation-modal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+            </div>
+            <div id="validation-content" style="font-size:13px;line-height:1.6;color:var(--text);max-height:70vh;overflow-y:auto;white-space:pre-wrap"></div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>App Settings</span>
+                <button class="btn-close" onclick="closeSettings()">&times;</button>
+            </div>
+            <div id="settings-save-message" style="display: none; color: var(--accent); font-size: 12px; margin-bottom: 8px; font-weight: bold; text-align: center;">✔ Settings saved</div>
+            
+            <div class="modal-tabs">
+                <div class="modal-tab" data-tab="webhook" onclick="switchTab('webhook')">Webhook Sync</div>
+                <div class="modal-tab active" data-tab="ai" onclick="switchTab('ai')">AI Assistant</div>
+            </div>
+
+            <div id="tab-webhook" class="tab-content">
+                <div class="settings-field">
+                    <label>Google Sheets Webhook URL</label>
+                    <div class="input-group">
+                        <input type="password" id="setting-webhook" placeholder="Not yet implemented" readonly>
+                        <button class="btn-icon" onclick="toggleField('setting-webhook', 'visibility')" title="Toggle Visibility">👁️</button>
+                        <button class="btn-icon" id="lock-webhook" onclick="toggleField('setting-webhook', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+                <div class="instructions" style="font-size: 10px;">Webhook integration coming soon. This will sync invoice data to Google Sheets.</div>
+            </div>
+
+            <div id="tab-ai" class="tab-content active">
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">AI Provider & Model</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <select id="setting-ai-model" onchange="toggleBaseUrlField(this.value)" disabled style="flex: 1; padding: 10px; border-radius: 4px; font-size: 13px;">
+                            <option value="" selected>Select a provider...</option>
+                            <optgroup label="Google Gemini">
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </optgroup>
+                            <optgroup label="OpenAI ChatGPT">
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                            </optgroup>
+                            <optgroup label="Anthropic Claude">
+                                <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (2024-06-20)</option>
+                                <option value="claude-3-5-haiku-20240620">Claude 3.5 Haiku (2024-06-20)</option>
+                                <option value="claude-3-opus-20240229">Claude 3 Opus (2024-02-29)</option>
+                                <option value="claude-opus-4-1">Claude Opus 4.1 (Field Log)</option>
+                                <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Field Log)</option>
+                            </optgroup>
+                            <optgroup label="xAI Grok">
+                                <option value="grok-beta">Grok Beta</option>
+                            </optgroup>
+                            <optgroup label="DeepSeek">
+                                <option value="deepseek-chat">DeepSeek Chat</option>
+                                <option value="deepseek-coder">DeepSeek Coder</option>
+                            </optgroup>
+                            <optgroup label="Perplexity">
+                                <option value="llama-3.1-sonar-large-128k-online">Sonar Large Online</option>
+                            </optgroup>
+                            <optgroup label="Custom / Local (OpenAI Compatible)">
+                                <option value="custom">Custom Endpoint</option>
+                            </optgroup>
+                        </select>
+                        <button class="btn-icon" id="lock-ai-model" onclick="toggleField('setting-ai-model', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">AI API Key</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="setting-ai-key" placeholder="Enter your API Key" readonly style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0.5px; width: 100%; min-width: 500px; user-select: text;">
+                        <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">👁️</button>
+                        <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-test" onclick="testAI()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
+                    </div>
+                </div>
+
+                <div class="settings-field" id="group-ai-base-url" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">API Base URL (e.g., http://localhost:11434/v1)</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="setting-ai-base-url" placeholder="https://api.openai.com/v1" readonly>
+                        <button class="btn-icon" id="lock-ai-base-url" onclick="toggleField('setting-ai-base-url', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span> <span id="temp-help-icon" title="Recommended 0.5-0.7 for invoice analysis" style="cursor: help; color: var(--accent);">ⓘ</span></label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="range" id="setting-ai-temp" min="0" max="2" step="0.1" value="0.7" disabled oninput="document.getElementById('val-ai-temp').textContent=this.value">
+                        <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                    <div id="temp-help-popup" style="display: none; position: absolute; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 300px; z-index: 100;">
+                        <strong>Temperature</strong><br>
+                        Controls AI response randomness:<br>
+                        • <strong>0.0–0.3:</strong> Focused, consistent (facts)<br>
+                        • <strong>0.5–0.7 (recommended):</strong> Balanced (invoice review)<br>
+                        • <strong>0.8–1.5:</strong> Creative, varied<br>
+                        • <strong>1.5+:</strong> Very random, unreliable
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">Max Tokens</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="setting-ai-tokens" placeholder="2048" disabled>
+                        <button class="btn-icon" id="lock-ai-tokens" onclick="toggleField('setting-ai-tokens', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label style="margin-bottom: 0;">System Instructions (Analysis Prompt)</label>
+                        <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
+                    </div>
+                    <div class="input-group">
+                        <textarea id="setting-ai-instructions" rows="3" readonly style="flex: 1; padding: 10px; border-radius: 4px; font-size: 13px; resize: vertical;"></textarea>
+                        <button class="btn-icon" id="lock-ai-instructions" onclick="toggleField('setting-ai-instructions', 'lock')" title="Unlock Field">🔒</button>
+                    </div>
+                </div>
+
+                <div class="instructions" style="font-size: 10px;">Configure your AI provider and parameters for invoice auditing.</div>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="closeSettings()" style="padding: 8px 16px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px;">Close</button>
+                <button onclick="saveSettings()" style="padding: 8px 16px; cursor: pointer; background: var(--accent); color: var(--bg); border: none; border-radius: 4px;">Save Settings</button>
+            </div>
+        </div>
+    </div> <!-- end settings-modal -->
+
+    <!-- AI Tools Menu Modal -->
+    <div id="ai-menu-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 400px; padding: 24px;">
+            <div class="modal-header">
+                <span>AI Tools</span>
+                <button class="btn-close" onclick="closeAiMenu()">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                <button onclick="closeAiMenu(); analyzeInvoiceAI();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: var(--bg); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">📊 Analyze Invoice Data</button>
+                <button onclick="closeAiMenu(); convertNamesToCodes();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">🏷️ Convert Names to Codes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="invoice-container">
+        <div class="header">
+            <img src="logo.jpg" alt="Logo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' rx=\'20\' fill=\'%230066cc\'/%3E%3Ccircle cx=\'40\' cy=\'40\' r=\'20\' fill=\'none\' stroke=\'white\' stroke-width=\'6\'/%3E%3Cline x1=\'55\' y1=\'55\' x2=\'80\' y2=\'80\' stroke=\'white\' stroke-width=\'10\' stroke-linecap=\'round\'/%3E%3C/svg%3E'; this.onerror=null;">
+            <div class="company-info">
+                <h1 style="font-size: 24px; margin-bottom: 5px; color: var(--text);">THOMAS LEE INVESTIGATIONS</h1>
+                <div class="company-details">
+                    427 Rodale Dr. Eagle Point, OR 97524<br>
+                    tlee.investigations@gmail.com<br>
+                    541-324-7636
+                </div>
+            </div>
+            <div class="vendor-info">
+                <strong>Vendor #:</strong> <span style="color: red;">3664110013-000</span><br>
+                <strong>PAE Info:</strong> <span id="field-pae-header" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                <span id="field-pae-expiration" style="display:none"></span><br>
+                <strong>Est. Trav Costs:</strong> <span id="field-trav-costs" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Auth Serv Amt:</strong> <span id="field-auth-serv" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Tot Auth Costs:</strong> <span id="field-total-auth" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <strong>Auth Hours:</strong> <span id="field-auth-hours" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                <div id="pae-date-note" style="color: var(--muted); font-size: 10px; margin-top: 4px; display: none; font-weight: normal; white-space: normal;">Does not include rate and mileage increase since pae was produced</div>
+            </div>
+        </div>
+        <div class="top-section">
+            <div class="client-section">
+                <div class="section-title">Client Information</div>
+                <div class="client-info">
+                    <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>PAE Exp:</strong> <span id="field-pae-expiration" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                </div>
+            </div>
+            <div class="invoice-details">
+                <div class="section-title">Invoice Details</div>
+                <div class="client-info">
+                    <strong>Investigator:</strong> <span id="field-investigator" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
+                    <strong>Invoice #:</strong> <span id="field-invoice-num" class="placeholder-bg" contenteditable="true">click here to enter</span><br>
+                    <strong>Invoice Date:</strong> <span id="field-invoice-date" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span><br>
+                    <strong>Date Range:</strong> <span id="field-date-range" class="placeholder-bg" contenteditable="true">Drop PAE or click to enter</span>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-heading">SERVICE HOURS</h2>
+        <table id="table-hours">
+            <thead>
+                <tr><th style="width: 80px;">Date</th><th style="width: 120px;">Category</th><th>Description</th><th class="hours-col">Hours</th></tr>
+            </thead>
+            <tbody>
+                <!-- Case data will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <h2 class="section-heading">MILEAGE</h2>
+        <table id="table-mileage">
+            <thead>
+                <tr><th style="width: 80px;">Date</th><th>Route</th><th class="miles-col">Miles</th></tr>
+            </thead>
+            <tbody>
+                <!-- Case data will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <h2 class="section-heading">OUT OF POCKET EXPENSES</h2>
+        <table id="table-expenses">
+            <thead>
+                <tr><th style="width: 80px;">Date</th><th style="width: 110px;">Category</th><th>Description</th><th style="width: 60px;">Qty</th><th class="amount-col">Amount</th></tr>
+            </thead>
+            <tbody>
+                <!-- Case data will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <h2 class="section-heading">INVOICE TOTALS</h2>
+        <table class="invoice-totals-table">
+            <thead>
+                <tr><th style="width: 80px;"></th><th style="width: 120px;"></th><th style="flex: 1;">Description</th><th style="width: 100px;">Qty</th><th style="width: 100px;">Rate</th><th class="amount-col">Amount</th></tr>
+            </thead>
+            <tbody>
+                <tr><td contenteditable="true" style="white-space: nowrap;">B&W Copies: 0</td><td contenteditable="true"></td><td contenteditable="true">Hours @ $55</td><td style="text-align: center;" contenteditable="true">0.0 hrs</td><td style="text-align: center;" contenteditable="true">$55.00</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true" style="white-space: nowrap;">Color Copies: 0</td><td contenteditable="true"></td><td contenteditable="true">Hours @ $59</td><td style="text-align: center;" contenteditable="true">0.0 hrs</td><td style="text-align: center;" contenteditable="true">$59.00</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Mileage @ 2025 Rate</td><td style="text-align: center;" contenteditable="true">0.0 mi</td><td style="text-align: center;" contenteditable="true">$0.70</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Mileage @ 2026 Rate</td><td style="text-align: center;" contenteditable="true">0 mi</td><td style="text-align: center;" contenteditable="true">$0.725</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Expenses</td><td style="text-align: center;" contenteditable="true">—</td><td style="text-align: center;" contenteditable="true">—</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr class="grand-total"><td></td><td></td><td style="text-align: right;">TOTAL:</td><td style="text-align: center;">—</td><td style="text-align: center;">—</td><td class="amount-col" id="field-grand-total">$0.00</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content" style="width: 350px;">
+            <div class="modal-header">
+                <span>Confirm Action</span>
+                <button class="btn-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin: 0; line-height: 1.6;">Are you sure?</p>
+            </div>
+            <div class="modal-actions">
+                <button onclick="closeConfirmModal()" style="padding: 8px 16px; cursor: pointer; background: #eee; border: 1px solid #ddd; border-radius: 4px;">No</button>
+                <button id="confirm-yes" onclick="confirmYes()" style="padding: 8px 16px; cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px;">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const CONFIG = {
+            RATE_EARLY: 55,
+            RATE_LATE: 59,
+            RATE_CUTOFF_DATE: new Date(2025, 7, 1), // August 1st, 2025
+            MILEAGE_2025: 0.70,
+            MILEAGE_2026: 0.725,
+            COPY_RATE_BW: 0.10,
+            COPY_RATE_COLOR: 0.50,
+            GOOGLE_WEBHOOK_URL: '',
+            AI_API_KEY: '',
+            AI_MODEL: '',
+            AI_INSTRUCTIONS: '',
+            AI_BASE_URL: '',
+            AI_TEMPERATURE: 0.7,
+            AI_MAX_TOKENS: 2048,
+            FIELD_LOCKS: {}
+        };
+
+        // Helper function to get or create case header and subtotal rows
+        function getOrCreateCaseRows(tableBody, caseNumber, colSpanData) {
+            let caseHeader = tableBody.querySelector(`.case-header[data-case-id="${caseNumber}"]`);
+            let subtotalRow = tableBody.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+
+            if (!caseHeader) {
+                // Create case header
+                caseHeader = document.createElement('tr');
+                caseHeader.classList.add('case-header');
+                caseHeader.setAttribute('data-case-id', caseNumber);
+                caseHeader.innerHTML = `<td colspan="${colSpanData}">Case: ${caseNumber}</td>`;
+                tableBody.appendChild(caseHeader);
+            }
+
+            if (!subtotalRow) {
+                subtotalRow = document.createElement('tr');
+                subtotalRow.classList.add('subtotal');
+                subtotalRow.setAttribute('data-case-id', caseNumber);
+                
+                const tableId = tableBody.closest('table').id;
+                if (tableId === 'table-hours') {
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Hours @ $${CONFIG.RATE_EARLY}: 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hours @ $${CONFIG.RATE_LATE}: 0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="hours-col" contenteditable="true">0.0</td>`;
+                } else if (tableId === 'table-mileage') {
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Mileage @ $${CONFIG.MILEAGE_2025} (2025): 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mileage @ $${CONFIG.MILEAGE_2026} (2026): 0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="miles-col" contenteditable="true">0.0</td>`;
+                } else if (tableId === 'table-expenses') {
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;">Subtotal:</td><td class="amount-col" contenteditable="true">$0.00</td>`;
+                }
+                tableBody.appendChild(subtotalRow);
+            }
+            return { caseHeader, subtotalRow };
+        }
+
+        function updateInvoiceTotals() {
+            let totalHours55 = 0, totalHours59 = 0;
+            let totalMiles2025 = 0, totalMiles2026 = 0;
+            let totalExpenses = 0;
+            let allServiceDates = [];
+
+            // Process Service Hours
+            const serviceTable = document.getElementById('table-hours');
+            const serviceCaseHeaders = serviceTable.querySelectorAll('.case-header');
+            serviceCaseHeaders.forEach(caseHeader => {
+                const caseNumber = caseHeader.dataset.caseId;
+                let caseHours55 = 0, caseHours59 = 0;
+                let currentRow = caseHeader.nextElementSibling;
+                while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                    const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
+                    const hoursCell = currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0';
+                    const hours = parseFloat(hoursCell) || 0;
+
+                    if (dateCell) {
+                        // Parse date as local time (avoid UTC rollover for ISO strings like 2026-05-04)
+                        const parts = dateCell.split(/[-\/]/); // Handle YYYY-MM-DD or MM/DD/YYYY
+                        let date;
+                        if (parts.length === 3) {
+                            // Determine format: if first part is 4 digits, it's YYYY-MM-DD
+                            if (parts[0].length === 4) {
+                                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            } else {
+                                // MM/DD/YYYY
+                                date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                            }
+                        } else {
+                            date = new Date(dateCell); // fallback
+                        }
+                        if (!isNaN(date.getTime())) allServiceDates.push(date);
+                        const year = date.getFullYear();
+                        if (year === 2025) caseHours55 += hours;
+                        else if (year === 2026) caseHours59 += hours;
+                    }
+                    currentRow = currentRow.nextElementSibling;
+                }
+                totalHours55 += caseHours55;
+                totalHours59 += caseHours59;
+
+                // Find the subtotal row specifically for this case group
+                const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
+                                    currentRow :
+                                    serviceTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+                if (subtotalRow && subtotalRow.cells.length >= 2) {
+                    subtotalRow.cells[0].innerHTML = `<span class="blue-text">Hours @ $${CONFIG.RATE_EARLY}: ${caseHours55.toFixed(1)}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hours @ $${CONFIG.RATE_LATE}: ${caseHours59.toFixed(1)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:`;
+                    subtotalRow.cells[1].textContent = (caseHours55 + caseHours59).toFixed(1);
+                }
+            });
+
+            // Update Date Range automatically from ALL service entries (even zero-hour entries)
+            if (allServiceDates.length > 0) {
+                const minDate = new Date(Math.min(...allServiceDates));
+                const maxDate = new Date(Math.max(...allServiceDates));
+                const formatDate = (d) => `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()}`;
+                const rangeEl = document.getElementById('field-date-range');
+                if (rangeEl) rangeEl.textContent = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
+            }
+
+            // Process Mileage
+            const mileageTable = document.getElementById('table-mileage');
+            const mileageCaseHeaders = mileageTable.querySelectorAll('.case-header');
+            mileageCaseHeaders.forEach(caseHeader => {
+                const caseNumber = caseHeader.dataset.caseId;
+                let caseMiles2025 = 0, caseMiles2026 = 0;
+                let currentRow = caseHeader.nextElementSibling;
+                while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                    const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
+                    const milesCell = currentRow.cells[2] ? currentRow.cells[2].textContent.trim() : '0';
+                    const miles = parseFloat(milesCell) || 0;
+
+                    if (dateCell && miles > 0) {
+                        const parts = dateCell.split(/[-\/]/);
+                        let date;
+                        if (parts.length === 3) {
+                            if (parts[0].length === 4) {
+                                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            } else {
+                                date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                            }
+                        } else {
+                            date = new Date(dateCell);
+                        }
+                        if (!isNaN(date.getTime())) allServiceDates.push(date);
+                        const year = date.getFullYear();
+                        if (year === 2025) caseMiles2025 += miles;
+                        else if (year === 2026) caseMiles2026 += miles;
+                    }
+                    currentRow = currentRow.nextElementSibling;
+                }
+                totalMiles2025 += caseMiles2025;
+                totalMiles2026 += caseMiles2026;
+
+                // Find the subtotal row specifically for this case group
+                const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
+                                    currentRow :
+                                    mileageTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+                if (subtotalRow && subtotalRow.cells.length >= 2) {
+                    subtotalRow.cells[0].innerHTML = `<span class="blue-text">Mileage @ $${CONFIG.MILEAGE_2025} (2025): ${caseMiles2025.toFixed(1)}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mileage @ $${CONFIG.MILEAGE_2026} (2026): ${caseMiles2026.toFixed(1)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:`;
+                    subtotalRow.cells[1].textContent = (caseMiles2025 + caseMiles2026).toFixed(1);
+                }
+            });
+
+            // Process Expenses
+            const expenseTable = document.getElementById('table-expenses');
+            const expenseCaseHeaders = expenseTable.querySelectorAll('.case-header');
+            let totalBW = 0, totalColor = 0;
+            expenseCaseHeaders.forEach(caseHeader => {
+                const caseNumber = caseHeader.dataset.caseId;
+                let caseExpenses = 0;
+                let caseBW = 0, caseColor = 0;
+                let currentRow = caseHeader.nextElementSibling;
+                while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                    const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
+                    const category = currentRow.cells[1] ? currentRow.cells[1].textContent.toLowerCase() : '';
+                    const description = currentRow.cells[2] ? currentRow.cells[2].textContent.toLowerCase() : '';
+                    const qty = parseFloat(currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0') || 0;
+
+                    if (dateCell) {
+                        const parts = dateCell.split(/[-\/]/);
+                        let date;
+                        if (parts.length === 3) {
+                            if (parts[0].length === 4) {
+                                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            } else {
+                                date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                            }
+                        } else {
+                            date = new Date(dateCell);
+                        }
+                        if (!isNaN(date.getTime())) allServiceDates.push(date);
+                    }
+
+                    if (category.includes('photocopy') || category.includes('copies')) {
+                        const rate = category.includes('color') ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                        const rowAmtCell = currentRow.cells[4];
+                        if (rowAmtCell && (rowAmtCell.textContent.trim() === '$0.00' || rowAmtCell.textContent.trim() === '' || rowAmtCell.dataset.auto === 'true')) {
+                            rowAmtCell.textContent = '$' + (qty * rate).toFixed(2);
+                            rowAmtCell.dataset.auto = 'true';
+                        }
+
+                        if (description.includes('b&w') || category.includes('b&w')) {
+                            totalBW += qty;
+                            caseBW += qty;
+                        } else if (description.includes('color') || category.includes('color')) {
+                            totalColor += qty;
+                            caseColor += qty;
+                        }
+                    }
+
+                    const amountCell = currentRow.cells[4];
+                    if (amountCell) {
+                        const amount = parseFloat(amountCell.textContent.replace(/[^\d.-]/g, '')) || 0;
+                        caseExpenses += amount;
+                    }
+                    currentRow = currentRow.nextElementSibling;
+                }
+                totalExpenses += caseExpenses;
+
+                // Find the subtotal row specifically for this case group
+                const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
+                                    currentRow :
+                                    expenseTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
+                if (subtotalRow && subtotalRow.cells.length >= 2) {
+                    let breakdown = [];
+                    if (caseBW > 0) breakdown.push(`B&W: ${caseBW}`);
+                    if (caseColor > 0) breakdown.push(`Color: ${caseColor}`);
+                    const labelText = breakdown.length > 0 ? `${breakdown.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;` : '';
+                    subtotalRow.cells[0].innerHTML = `${labelText}Subtotal:`;
+                    subtotalRow.cells[1].textContent = '$' + caseExpenses.toFixed(2);
+                }
+            });
+
+            // Update totals table
+            const totalsTable = document.querySelector('.invoice-totals-table tbody');
+            if (!totalsTable) return;
+            const totalRows = totalsTable.querySelectorAll('tr');
+            if (totalRows.length < 6) return; // Safety: totals table malformed
+
+            totalRows[0].cells[0].textContent = `B&W Copies: ${totalBW} ($${(totalBW * CONFIG.COPY_RATE_BW).toFixed(2)})`;
+            totalRows[1].cells[0].textContent = `Color Copies: ${totalColor} ($${(totalColor * CONFIG.COPY_RATE_COLOR).toFixed(2)})`;
+
+            totalRows[0].cells[2].textContent = `Investigator Service - Hours @ $${CONFIG.RATE_EARLY}`;
+            totalRows[0].cells[3].textContent = totalHours55.toFixed(1) + ' hrs';
+            totalRows[0].cells[4].textContent = `$${CONFIG.RATE_EARLY.toFixed(2)}`;
+            totalRows[0].cells[5].textContent = '$' + (totalHours55 * CONFIG.RATE_EARLY).toFixed(2);
+
+            totalRows[1].cells[2].textContent = `Investigator Service - Hours @ $${CONFIG.RATE_LATE}`;
+            totalRows[1].cells[3].textContent = totalHours59.toFixed(1) + ' hrs';
+            totalRows[1].cells[4].textContent = `$${CONFIG.RATE_LATE.toFixed(2)}`;
+            totalRows[1].cells[5].textContent = '$' + (totalHours59 * CONFIG.RATE_LATE).toFixed(2);
+
+            totalRows[2].cells[3].textContent = totalMiles2025.toFixed(1) + ' mi';
+            totalRows[2].cells[5].textContent = '$' + (totalMiles2025 * CONFIG.MILEAGE_2025).toFixed(2);
+
+            totalRows[3].cells[3].textContent = totalMiles2026.toFixed(1) + ' mi';
+            totalRows[3].cells[5].textContent = '$' + (totalMiles2026 * CONFIG.MILEAGE_2026).toFixed(2);
+
+            totalRows[4].cells[2].textContent = 'Out of Pocket Expenses';
+            totalRows[4].cells[5].textContent = '$' + totalExpenses.toFixed(2);
+
+            const grandTotal = (totalHours55 * CONFIG.RATE_EARLY) + (totalHours59 * CONFIG.RATE_LATE) +
+                               (totalMiles2025 * CONFIG.MILEAGE_2025) + (totalMiles2026 * CONFIG.MILEAGE_2026) + totalExpenses;
+            totalRows[5].cells[0].textContent = '';
+            totalRows[5].cells[1].textContent = '';
+            totalRows[5].cells[2].textContent = '';
+            totalRows[5].cells[3].textContent = '';
+            totalRows[5].cells[4].textContent = 'TOTAL:';
+            totalRows[5].cells[4].style.textAlign = 'right';
+            totalRows[5].cells[5].textContent = '$' + grandTotal.toFixed(2);
+            
+            // Apply continuous bottom border to all cells in grand total row
+            for (let i = 0; i < 6; i++) {
+                totalRows[5].cells[i].style.borderBottom = '2px solid #666';
+            }
+
+            // Overage/remaining status in left cells of grand total row (always visible when auth hours set)
+            const authHoursEl = document.getElementById('field-auth-hours');
+            const authHours = parseFloat(authHoursEl ? authHoursEl.textContent : '') || 0;
+            const totalHoursBilled = totalHours55 + totalHours59;
+            
+            if (authHours > 0) {
+                if (totalHoursBilled > authHours) {
+                    const overage = (totalHoursBilled - authHours).toFixed(1);
+                    totalRows[5].cells[0].textContent = `⚠️ +${overage} hrs over auth`;
+                    totalRows[5].cells[0].style.cssText = 'background: #522; color: #ffcccc; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #f66; border-bottom: 2px solid #f66;';
+                    totalRows[5].cells[1].style.cssText = 'background: #522; border-top: 2px solid #f66; border-bottom: 2px solid #f66; border-left: none; border-right: none; color: #ffcccc;';
+                } else {
+                    const remaining = (authHours - totalHoursBilled).toFixed(1);
+                    totalRows[5].cells[0].textContent = `✓ ${remaining} hrs remaining`;
+                    totalRows[5].cells[0].style.cssText = 'background: #252525; color: #6f6; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #666; border-bottom: 2px solid #666;';
+                    totalRows[5].cells[1].style.cssText = 'background: #252525; border-top: 2px solid #666; border-bottom: 2px solid #666; border-left: none; border-right: none; color: #6f6;';
+                }
+            } else {
+                totalRows[5].cells[0].textContent = '';
+                totalRows[5].cells[0].style.cssText = '';
+                totalRows[5].cells[1].style.cssText = '';
+            }
+
+            // Update placeholder background visibility
+            document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+                const placeholders = ["click here to enter", "Drop PAE or click to enter"];
+                if (placeholders.includes(el.textContent.trim())) {
+                    el.classList.add('placeholder-bg');
+                } else {
+                    el.classList.remove('placeholder-bg');
+                }
+            });
+
+            // Auto-save
+            saveInvoiceData();
+        }
+
+        // Shared logic to extract header info from text (PDF or Paste)
+        function extractHeaderInfo(fullText) {
+            const patterns = {
+                client: /Client:\s*([^:\n]+?)(?=Case|Attorney|PAE|PA|County|$)/i,
+                case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*(\S+)/i,
+                attorney: /Attorney:\s*([^:\n]+?)(?=PAE|PA|Case|Client|Authorization|$)/i,
+                pae: /(?:Authorization\s*No|PAE|PA)\s*(?:#|No\.?|Number)?\s*:?\s*(\d+)/i,
+                'trav-costs': /Est\.?\s*Trav(?:el)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
+                'auth-serv': /Auth(?:orized)?\s*Serv(?:ice)?\s*Amount\s*(?:Not\s*to\s*Exceed)?\s*:\s*([\$0-9,.]+)/i,
+                'auth-hours': /(?:Auth(?:orized)?\s*(?:Hours|Hrs)|Maximum\s*Quantity)\s*:?\s*([\d,.]+)/i,
+                'total-auth': /Total\s*Auth(?:orized)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
+                'pae-date': /(?:Effective|Processed)\s*Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                'pae-expiration': /(?:Expir(?:ation)?|Valid(?:ity)?\s*(?:Until|Thru|Through))\s*Date\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
+            };
+
+            let found = false;
+            Object.entries(patterns).forEach(([key, regex]) => {
+                const match = fullText.match(regex);
+                if (match && match[1]) {
+                    const val = match[1].trim();
+                    let targetId = '';
+                    
+                    if (key === 'pae') {
+                        targetId = 'field-pae';
+                        const headerPae = document.getElementById('field-pae-header');
+                        if (headerPae) headerPae.textContent = val;
+                    } else if (key === 'pae-date') {
+                        const paeDate = new Date(val);
+                        const noteEl = document.getElementById('pae-date-note');
+                        if (noteEl && !isNaN(paeDate.getTime())) {
+                            noteEl.style.display = paeDate < CONFIG.RATE_CUTOFF_DATE ? 'block' : 'none';
+                        }
+                        // Auto-fill Invoice Date if it's currently a placeholder
+                        const invDateEl = document.getElementById('field-invoice-date');
+                        if (invDateEl && (invDateEl.textContent.trim() === "" || invDateEl.textContent.includes("enter"))) {
+                            invDateEl.textContent = val;
+                        }
+                        found = true;
+                        return;
+                    } else {
+                        targetId = `field-${key}`;
+                    }
+
+                    const el = document.getElementById(targetId);
+                    if (el) {
+                        el.textContent = val;
+                        found = true;
+                    }
+                }
+            });
+            return found;
+        }
+
+        function getInvoiceState() {
+            const state = {};
+
+            // Save header fields
+            const headerFields = [
+                'field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth',
+                'field-client', 'field-case', 'field-attorney', 'field-pae', 'field-pae-expiration',
+                'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range',
+                'field-grand-total'
+            ];
+            headerFields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) state[id] = el.textContent;
+            });
+
+            // Save table data
+            state.tables = { hours: [], mileage: [], expenses: [] };
+            const tableMap = {
+                'table-hours': 'hours',
+                'table-mileage': 'mileage',
+                'table-expenses': 'expenses'
+            };
+
+            Object.entries(tableMap).forEach(([tableId, key]) => {
+                const tableBody = document.getElementById(tableId).querySelector('tbody');
+                const caseHeaders = tableBody.querySelectorAll('.case-header');
+                caseHeaders.forEach(caseHeader => {
+                    const caseNumber = caseHeader.dataset.caseId;
+                    const caseData = { caseNumber: caseNumber, rows: [] };
+                    let currentRow = caseHeader.nextElementSibling;
+                    while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
+                        const rowCells = Array.from(currentRow.cells).map(cell => cell.textContent);
+                        caseData.rows.push(rowCells);
+                        currentRow = currentRow.nextElementSibling;
+                    }
+                    state.tables[key].push(caseData);
+                });
+            });
+            return state;
+        }
+
+        function saveInvoiceData() {
+            const invoiceState = getInvoiceState();
+            localStorage.setItem('invoiceData', JSON.stringify(invoiceState));
+
+            // DATA PERSISTENCE GUARD:
+            // Don't auto-save if the invoice is currently empty. This prevents 
+            // overwriting your saved data with a blank screen during a refresh.
+            if (document.querySelectorAll('.case-header').length === 0) {
+                return;
+            }
+
+            const indicator = document.getElementById('save-indicator');
+            if (indicator) {
+                indicator.classList.add('visible');
+                clearTimeout(indicator.saveTimeout);
+                indicator.saveTimeout = setTimeout(() => indicator.classList.remove('visible'), 2000);
+            }
+        }
+
+        function openAiMenu() {
+            document.getElementById('ai-menu-modal').style.display = 'flex';
+        }
+        function closeAiMenu() {
+            document.getElementById('ai-menu-modal').style.display = 'none';
+        }
+
+        async function analyzeInvoiceAI() {
+            const btn = document.getElementById('btn-ai');
+            if (btn && btn.disabled) {
+                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
+                return;
+            }
+            if (!CONFIG.AI_API_KEY) {
+                alert("Please configure the AI API Key in Settings (⚙️).");
+                return;
+            }
+            if (!CONFIG.AI_MODEL) {
+                alert("Please select an AI model in Settings (⚙️).");
+                return;
+            }
+
+            const apiKey = CONFIG.AI_API_KEY.trim();
+
+            const state = getInvoiceState();
+            const resultsDiv = document.getElementById('ai-results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<span class="ai-loading">AI is analyzing invoice data for patterns and discrepancies...</span>';
+
+            const systemPrompt = CONFIG.AI_INSTRUCTIONS || "Analyze this legal investigation invoice data and provide a concise summary. Check for potential billing errors, summarize total hours per case, and suggest if any mileage entries look unusual based on the descriptions.";
+            const prompt = `${systemPrompt}\n\nInvoice Data: ${JSON.stringify(state, null, 2)}`;
+
+            try {
+                const model = CONFIG.AI_MODEL || 'gemini-1.5-flash';
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+                const temperature = CONFIG.AI_TEMPERATURE || 0.7;
+                const max_tokens = CONFIG.AI_MAX_TOKENS || 2048;
+                const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, ''); // Clean trailing slash
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    body = JSON.stringify({ 
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature, maxOutputTokens: max_tokens },
+                        safetySettings: [ // Default safety settings for Gemini
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ]
+                    });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = JSON.stringify({
+                        model,
+                        max_tokens,
+                        temperature,
+                        system: systemPrompt,
+                        messages: [{ role: 'user', content: `Here is the invoice data to analyze:\n\n${JSON.stringify(state, null, 2)}` }]
+                    });
+                } else {
+                    // OpenAI Compatible API (GPT, Grok, DeepSeek, Perplexity, Custom)
+                    if (model === 'custom') {
+                        if (!baseUrl) {
+                            resultsDiv.innerHTML = "<strong>Error:</strong> Custom endpoint selected but API Base URL is empty.";
+                            return;
+                        }
+                        url = baseUrl + '/chat/completions';
+                    } else if (model.startsWith('gpt')) {
+                        url = 'https://api.openai.com/v1/chat/completions';
+                    } else if (model.startsWith('deepseek')) {
+                        url = 'https://api.deepseek.com/chat/completions';
+                    } else if (model.includes('sonar')) { // Perplexity
+                        url = 'https://api.perplexity.ai/chat/completions';
+                    } else if (model.startsWith('grok')) {
+                        url = 'https://api.x.ai/v1/chat/completions';
+                    } else {
+                        resultsDiv.innerHTML = `<strong>Error:</strong> Unsupported model selected: ${model}`;
+                        return;
+                    }
+
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = JSON.stringify({ 
+                        model: model === 'custom' ? 'default' : model, 
+                        messages: [{ role: 'user', content: prompt }],
+                        temperature,
+                        max_tokens
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    const errorMessage = errorData.error?.message || response.statusText;
+                    throw new Error(`${errorMessage}`);
+                }
+
+                const result = await response.json();
+                
+                let aiText = '';
+                if (model.startsWith('gemini')) aiText = result.candidates[0].content.parts[0].text;
+                else if (model.startsWith('claude')) aiText = result.content[0].text;
+                else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content; // Standard OpenAI format
+
+                resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
+            } catch (error) {
+                console.error("AI Error:", error);
+                resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            }
+
+            // Validation: check for errors, missing fields, rate mistakes, duplicates, etc.
+        }
+
+        async function validateInvoice() {
+            const btn = document.getElementById('btn-validate');
+            if (btn && btn.disabled) {
+                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
+                return;
+            }
+            if (!CONFIG.AI_API_KEY) {
+                alert("Please configure the AI API Key in Settings (⚙️).");
+                return;
+            }
+            if (!CONFIG.AI_MODEL) {
+                alert("Please select an AI model in Settings (⚙️).");
+                return;
+            }
+
+            const apiKey = CONFIG.AI_API_KEY.trim();
+
+            const state = getInvoiceState();
+            const modal = document.getElementById('validation-modal');
+            const contentEl = document.getElementById('validation-content');
+            modal.style.display = 'flex';
+            contentEl.innerHTML = '<span class="ai-loading">Validating invoice... checking for errors and discrepancies...</span>';
+
+            const validationPrompt = `You are an invoice validation assistant for a legal investigation firm. Review the provided invoice data and produce a structured validation report.
 
 VALIDATION CHECKS:
 1. Rate Errors: For each service hour entry, check if its date falls before or after Aug 1, 2025 and verify the rate matches the expected rate for that date period. If mismatches found, list each with date, case #, expected vs actual rate. If no entries exist for a period, just say "No rate errors detected." If no service hours at all, say "No service hours to validate."
@@ -45,3 +1039,1119 @@ Warnings: N
 If no issues: "No validation issues detected."
 
 Use complete sentences where helpful. Be specific (date, case #, description snippets) but concise. Group related items under section headers.
+
+            const prompt = `${validationPrompt}\n\nInvoice Data: ${JSON.stringify(state, null, 2)}`;
+
+            try {
+                const model = CONFIG.AI_MODEL;
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+                const temperature = CONFIG.AI_TEMPERATURE || 0.3;
+                const max_tokens = CONFIG.AI_MAX_TOKENS || 2048;
+                const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, '');
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    body = JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature, maxOutputTokens: max_tokens * 2 },
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ]
+                    });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = JSON.stringify({
+                        model,
+                        max_tokens: max_tokens * 2,
+                        temperature,
+                        system: validationPrompt,
+                        messages: [{ role: 'user', content: `Validate this invoice data:\n\n${JSON.stringify(state, null, 2)}` }]
+                    });
+                } else {
+                    const openAiBaseUrl = baseUrl || 'https://api.openai.com/v1';
+                    url = openAiBaseUrl + '/chat/completions';
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = JSON.stringify({
+                        model: model === 'custom' ? 'gpt-3.5-turbo' : model,
+                        messages: [
+                            { role: 'system', content: validationPrompt },
+                            { role: 'user', content: `Validate this invoice data:\n\n${JSON.stringify(state, null, 2)}` }
+                        ],
+                        temperature,
+                        max_tokens: max_tokens * 2
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    const errorMessage = errorData.error?.message || response.statusText;
+                    throw new Error(`${errorMessage}`);
+                }
+
+                const result = await response.json();
+
+                let aiText = '';
+                if (model.startsWith('gemini')) aiText = result.candidates[0].content.parts[0].text;
+                else if (model.startsWith('claude')) aiText = result.content[0].text;
+                else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content;
+
+                contentEl.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}`;
+            } catch (error) {
+                console.error("Validation Error:", error);
+                contentEl.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            }
+        }
+
+        function applyInvoiceState(invoiceState) {
+            // Load header fields
+            Object.entries(invoiceState).forEach(([id, value]) => {
+                if (id !== 'tables') {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = value;
+                }
+            });
+
+            // Clear and rebuild tables
+            ['table-hours', 'table-mileage', 'table-expenses'].forEach(id => {
+                const tbody = document.getElementById(id).querySelector('tbody');
+                if (tbody) tbody.innerHTML = '';
+            });
+
+            if (invoiceState.tables) {
+                const configs = {
+                    hours: { id: 'table-hours', cols: 4, class: 'hours-col', colIdx: 3 },
+                    mileage: { id: 'table-mileage', cols: 3, class: 'miles-col', colIdx: 2 },
+                    expenses: { id: 'table-expenses', cols: 5, class: 'amount-col', colIdx: 4 }
+                };
+
+                Object.entries(configs).forEach(([key, cfg]) => {
+                    const tableData = invoiceState.tables[key];
+                    if (!tableData) return;
+                    const tbody = document.getElementById(cfg.id).querySelector('tbody');
+                    tableData.forEach(caseGroup => {
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseGroup.caseNumber, cfg.cols);
+                        caseGroup.rows.forEach(rowData => {
+                            const tr = document.createElement('tr');
+                            rowData.forEach((cellText, idx) => {
+                                const td = document.createElement('td');
+                                td.textContent = cellText;
+                                    td.contentEditable = "true";
+                                if (idx === cfg.colIdx) td.className = cfg.class;
+                                tr.appendChild(td);
+                            });
+                            subtotalRow.insertAdjacentElement('beforebegin', tr);
+                        });
+                    });
+                });
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            const targetTab = document.querySelector(`.modal-tab[data-tab="${tabId}"]`);
+            const targetContent = document.getElementById(`tab-${tabId}`);
+            
+            if (targetTab) targetTab.classList.add('active');
+            if (targetContent) targetContent.classList.add('active');
+        }
+
+        function toggleBaseUrlField(model) {
+            const group = document.getElementById('group-ai-base-url');
+            if (group) group.style.display = (model === 'custom') ? 'block' : 'none';
+        }
+
+        function openSettings() {
+            document.getElementById('setting-webhook').value = CONFIG.GOOGLE_WEBHOOK_URL || '';
+            document.getElementById('setting-ai-key').value = CONFIG.AI_API_KEY || '';
+            
+            const modelEl = document.getElementById('setting-ai-model');
+            const instrEl = document.getElementById('setting-ai-instructions');
+            const baseUrlEl = document.getElementById('setting-ai-base-url');
+            const tempEl = document.getElementById('setting-ai-temp');
+            const tokensEl = document.getElementById('setting-ai-tokens');
+            
+            if (modelEl) modelEl.value = CONFIG.AI_MODEL || '';
+            if (instrEl) instrEl.value = CONFIG.AI_INSTRUCTIONS || '';
+            if (baseUrlEl) baseUrlEl.value = CONFIG.AI_BASE_URL || '';
+            if (tempEl) {
+                tempEl.value = CONFIG.AI_TEMPERATURE || 0.7;
+                document.getElementById('val-ai-temp').textContent = tempEl.value;
+            }
+            if (tokensEl) tokensEl.value = CONFIG.AI_MAX_TOKENS || 2048;
+
+            toggleBaseUrlField(modelEl ? modelEl.value : '');
+            
+            // Default to the first tab (webhook)
+            switchTab('webhook');
+
+            // Ensure fields are locked/unlocked per saved state
+            const fieldIds = ['setting-webhook', 'setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'];
+            fieldIds.forEach(id => {
+                const locked = CONFIG.FIELD_LOCKS[id] !== false; // default locked
+                setFieldLockState(id, locked);
+            });
+            
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+        function setFieldLockState(id, locked) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const suffix = id.replace('setting-', '');
+            const lockBtn = document.getElementById('lock-' + suffix);
+            const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number';
+            
+            if (useDisabled) {
+                input.disabled = locked;
+            } else {
+                input.readOnly = locked;
+            }
+            input.style.background = locked ? '#f5f5f5' : '#fff';
+            if (lockBtn) lockBtn.textContent = locked ? '🔒' : '🔓';
+        }
+
+        function toggleField(id, action) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const suffix = id.replace('setting-', '');
+            const lockBtn = document.getElementById('lock-' + suffix);
+
+            if (action === 'visibility') {
+                if (input.tagName === 'INPUT') {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                }
+            } else if (action === 'lock') {
+                const useDisabled = input.tagName === 'SELECT' || input.type === 'range' || input.type === 'number';
+                const isLocked = useDisabled ? input.disabled : input.readOnly;
+                const newState = !isLocked;
+                
+                if (useDisabled) {
+                    input.disabled = newState;
+                } else {
+                    input.readOnly = newState;
+                }
+                
+                input.style.background = newState ? '#f5f5f5' : '#fff';
+                
+                if (lockBtn) lockBtn.textContent = newState ? '🔒' : '🔓';
+                if (!newState) input.focus();
+
+                // Explicitly persist current field value at lock time
+                const value = input.value;
+                switch(id) {
+                    case 'setting-webhook': CONFIG.GOOGLE_WEBHOOK_URL = value; break;
+                    case 'setting-ai-key': CONFIG.AI_API_KEY = value; break;
+                    case 'setting-ai-model': CONFIG.AI_MODEL = value; break;
+                    case 'setting-ai-instructions': CONFIG.AI_INSTRUCTIONS = value; break;
+                    case 'setting-ai-base-url': CONFIG.AI_BASE_URL = value; break;
+                    case 'setting-ai-temp': CONFIG.AI_TEMPERATURE = parseFloat(value) || 0.7; break;
+                    case 'setting-ai-tokens': CONFIG.AI_MAX_TOKENS = parseInt(value) || 2048; break;
+                }
+
+                // Update and save lock state
+                CONFIG.FIELD_LOCKS[id] = newState;
+                saveSettings();
+            }
+        }
+
+        async function testAI() {
+            const key = document.getElementById('setting-ai-key').value.trim();
+            const model = document.getElementById('setting-ai-model').value;
+            if (!key) return alert("Enter an API key first.");
+            if (!model) return alert("Select an AI model first.");
+
+            try {
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+                const testPrompt = "Respond with 'Connected'";
+                const baseUrl = document.getElementById('setting-ai-base-url').value.trim();
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                    body = JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }] });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = key;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: testPrompt }] });
+                } else if (model.startsWith('gpt') || model.startsWith('grok') || model.startsWith('deepseek') || model.includes('sonar') || model === 'custom') {
+                    // OpenAI Compatible
+                    if (model === 'custom') {
+                        if (!baseUrl) throw new Error("Custom endpoint selected but API Base URL is empty.");
+                        url = baseUrl.replace(/\/$/, '') + '/chat/completions';
+                    } else if (model.startsWith('gpt')) {
+                        url = 'https://api.openai.com/v1/chat/completions';
+                    } else if (model.startsWith('grok')) {
+                        url = 'https://api.x.ai/v1/chat/completions';
+                    } else if (model.startsWith('deepseek')) {
+                        url = 'https://api.deepseek.com/chat/completions';
+                    } else if (model.includes('sonar')) {
+                        url = 'https://api.perplexity.ai/chat/completions';
+                    }
+
+                    headers['Authorization'] = `Bearer ${key}`;
+                    body = JSON.stringify({ 
+                        model: model === 'custom' ? 'default' : model, 
+                        messages: [{ role: 'user', content: testPrompt }] 
+                    });
+                } else {
+                    throw new Error(`Unsupported model: ${model}`);
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Anthropic and OpenAI often nest messages, while Gemini sometimes uses top-level error objects.
+                    const errorMessage = errorData.error?.message || errorData.error || errorData.message || response.statusText;
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                
+                let success = false, message = "";
+                if (model.startsWith('gemini')) { success = !!data.candidates; message = success ? data.candidates[0].content.parts[0].text : data.error?.message; }
+                else if (model.startsWith('claude')) { success = !!data.content; message = success ? data.content[0].text : "Unexpected response format"; }
+                else { success = !!data.choices; message = success ? data.choices[0].message.content : "Unexpected response format"; }
+
+                if (success) {
+                    alert(`AI Connection Successful (${model}): ` + message);
+                } else {
+                    alert("AI Error: " + (message || "Invalid Response"));
+                }
+            } catch (e) {
+                alert("Connection failed: " + e.message);
+            }
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        function saveSettings() {
+            CONFIG.GOOGLE_WEBHOOK_URL = document.getElementById('setting-webhook').value.trim();
+            CONFIG.AI_API_KEY = document.getElementById('setting-ai-key').value.trim();
+            CONFIG.AI_MODEL = document.getElementById('setting-ai-model').value.trim();
+            CONFIG.AI_INSTRUCTIONS = document.getElementById('setting-ai-instructions').value.trim();
+            CONFIG.AI_BASE_URL = document.getElementById('setting-ai-base-url').value.trim();
+            CONFIG.AI_TEMPERATURE = parseFloat(document.getElementById('setting-ai-temp').value);
+            CONFIG.AI_MAX_TOKENS = parseInt(document.getElementById('setting-ai-tokens').value) || 2048;
+            
+            localStorage.setItem('invoiceSettings', JSON.stringify({
+                webhook: CONFIG.GOOGLE_WEBHOOK_URL,
+                aiKey: CONFIG.AI_API_KEY,
+                aiModel: CONFIG.AI_MODEL,
+                aiInstructions: CONFIG.AI_INSTRUCTIONS,
+                aiBaseUrl: CONFIG.AI_BASE_URL,
+                aiTemp: CONFIG.AI_TEMPERATURE,
+                aiTokens: CONFIG.AI_MAX_TOKENS,
+                locks: CONFIG.FIELD_LOCKS
+            }));
+            
+            updateActiveModelDisplay();
+            updateAIButtonState();
+
+            // Sync the dropdown to saved value (useful if modal stayed open)
+            const modelEl = document.getElementById('setting-ai-model');
+            if (modelEl) modelEl.value = CONFIG.AI_MODEL;
+            toggleBaseUrlField(CONFIG.AI_MODEL);
+
+            // Show confirmation without closing modal
+            const saveMsg = document.getElementById('settings-save-message');
+            if (saveMsg) {
+                saveMsg.style.display = 'block';
+                saveMsg.textContent = '✔ Settings saved';
+                setTimeout(() => { saveMsg.style.display = 'none'; }, 2000);
+            }
+        }
+
+        function updateActiveModelDisplay() {
+            const displayEl = document.getElementById('active-model-display');
+            if (displayEl) {
+                displayEl.textContent = CONFIG.AI_MODEL ? `Active: ${CONFIG.AI_MODEL}` : '';
+            }
+            updateAIButtonState();
+        }
+
+        function updateAIButtonState() {
+            const btn = document.getElementById('btn-ai');
+            if (btn) {
+                const hasKey = CONFIG.AI_API_KEY && CONFIG.AI_API_KEY.trim().length > 0;
+                const hasModel = CONFIG.AI_MODEL && CONFIG.AI_MODEL.trim().length > 0;
+                const enabled = hasKey && hasModel;
+                btn.disabled = !enabled;
+                btn.style.opacity = enabled ? '1' : '0.5';
+                btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+                if (!enabled) {
+                    btn.title = 'Configure AI API key and model in Settings (⚙️) to enable';
+                } else {
+                    btn.title = 'AI analysis of invoice';
+                }
+            }
+            // Convert Names button stays enabled; it will warn if AI not configured
+        }
+
+        function loadInvoiceData() {
+            // Load user settings first
+            const savedSettings = localStorage.getItem('invoiceSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                CONFIG.GOOGLE_WEBHOOK_URL = settings.webhook || '';
+                CONFIG.AI_API_KEY = settings.aiKey || '';
+                CONFIG.AI_MODEL = settings.aiModel || '';
+                CONFIG.AI_INSTRUCTIONS = settings.aiInstructions || '';
+                CONFIG.AI_BASE_URL = settings.aiBaseUrl || '';
+                CONFIG.AI_TEMPERATURE = settings.aiTemp || 0.7;
+                CONFIG.AI_MAX_TOKENS = settings.aiTokens || 2048;
+                CONFIG.FIELD_LOCKS = settings.locks || {};
+            }
+
+            updateActiveModelDisplay();
+            updateAIButtonState();
+
+            const savedData = localStorage.getItem('invoiceData');
+            if (savedData) applyInvoiceState(JSON.parse(savedData));
+        }
+
+        // Name conversion via AI — extracts names from service hours and assigns labels
+        // Name conversion via AI — extracts names from service hours and assigns labels
+        async function convertNamesToCodes() {
+            // 1. Collect all service hours rows with case numbers
+            const rows = [];
+            document.querySelectorAll('#table-hours tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                if (cells.length >= 3) {
+                    const desc = cells[2].textContent.trim();
+                    const caseEl = tr.closest('tbody').querySelector('.case-header');
+                    const caseNum = caseEl ? caseEl.textContent.replace('Case:', '').trim() : 'Unknown';
+                    rows.push({ desc, case: caseNum, element: cells[2] });
+                }
+            });
+
+            if (rows.length === 0) {
+                alert("No service entries found to scan.");
+                return;
+            }
+
+            // 2. Prepare data for AI: group by case
+            const caseGroups = {};
+            rows.forEach(r => {
+                if (!caseGroups[r.case]) caseGroups[r.case] = [];
+                caseGroups[r.case].push(r.desc);
+            });
+
+            const payload = Object.entries(caseGroups).map(([caseNum, descs]) => 
+                `Case ${caseNum}:\n` + descs.map((d, i) => `${i + 1}. ${d}`).join('\n')
+            ).join('\n\n');
+
+            // 3. Call AI to extract names
+            if (!CONFIG.AI_API_KEY || !CONFIG.AI_MODEL) {
+                alert("AI not configured. Set API key and model in Settings.");
+                return;
+            }
+
+            const prompt = `From the following service descriptions, extract all person names (including witnesses, victims, clients, POIs, investigators, etc.). Names may be capitalized or lowercase. Return ONLY a JSON array of unique name strings, e.g., ["John Smith","Jane Doe"]. Do not include explanations.\n\n${payload}`;
+
+            let extractedNames = [];
+            try {
+                const model = CONFIG.AI_MODEL || '';
+                const apiKey = CONFIG.AI_API_KEY || '';
+                if (!apiKey || !model) {
+                    alert("AI not configured. Set API key and model in Settings.");
+                    return;
+                }
+                let url, headers = { 'Content-Type': 'application/json' }, body;
+
+                if (model.startsWith('gemini')) {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    body = JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+                    });
+                } else if (model.startsWith('claude')) {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = JSON.stringify({
+                        model,
+                        max_tokens: 2048,
+                        temperature: 0.3,
+                        system: 'You are a text analysis assistant. Return only a JSON array of person names found in the text, with no additional commentary.',
+                        messages: [{ role: 'user', content: prompt }]
+                    });
+                } else {
+                    // OpenAI-compatible
+                    const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, '') || 'https://api.openai.com/v1';
+                    url = baseUrl + '/chat/completions';
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = JSON.stringify({
+                        model: model === 'custom' ? 'gpt-3.5-turbo' : model,
+                        messages: [
+                            { role: 'system', content: 'Return only a JSON array of person names.' },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: 0.3,
+                        max_tokens: 2048
+                    });
+                }
+
+                const response = await fetch(url, { method: 'POST', headers, body });
+                if (!response.ok) throw new Error(`AI request failed: ${response.status}`);
+
+                const result = await response.json();
+                let text = '';
+                if (model.startsWith('gemini')) {
+                    text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                } else if (model.startsWith('claude')) {
+                    text = result.content?.[0]?.text || '';
+                } else {
+                    text = result.choices?.[0]?.message?.content || '';
+                }
+
+                // Parse JSON array from response
+                const match = text.match(/\[.*\]/s);
+                if (match) {
+                    extractedNames = JSON.parse(match[0]);
+                } else {
+                    // Fallback: try to extract names line by line
+                    extractedNames = text.split('\n')
+                        .map(l => l.replace(/^[\d\.\-\*•\s]+/, '').trim())
+                        .filter(l => l.length > 0);
+                }
+            } catch (e) {
+                alert('AI extraction failed: ' + e.message);
+                return;
+            }
+
+            // 4. Build name -> cases map
+            const nameMap = new Map();
+            rows.forEach(({ desc, caseNum }) => {
+                extractedNames.forEach(name => {
+                    if (desc.toLowerCase().includes(name.toLowerCase())) {
+                        if (!nameMap.has(name)) nameMap.set(name, new Set());
+                        nameMap.get(name).add(caseNum);
+                    }
+                });
+            });
+
+            if (nameMap.size === 0) {
+                alert("No matching names found in descriptions.");
+                return;
+            }
+
+            // 5. Build assignments array
+            const assignments = [];
+            nameMap.forEach((cases, name) => {
+                assignments.push({
+                    name,
+                    cases: Array.from(cases),
+                    label: 'skip'
+                });
+            });
+            assignments.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Build and show modal
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;padding:20px';
+            const modal = document.createElement('div');
+            modal.className = 'modal-content';
+            modal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow:auto';
+
+            let html = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <div style="font-family:var(--ui);font-weight:800;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text)">Assign Name Labels</div>
+                    <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+                </div>
+                <div style="margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.5">
+                    For each name found, assign a label and optional number. The name will be replaced with that label in all cases.<br>
+                    <strong>Note:</strong> Client and Investigator header fields are never changed.
+                </div>
+                <div style="display:grid;grid-template-columns:1.5fr 1fr 130px 80px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+                    <div>Name</div>
+                    <div>Case(s)</div>
+                    <div style="text-align:center">Label</div>
+                    <div style="text-align:center">Number</div>
+                </div>
+                <div id="name-assignments-list"></div>
+                <div style="margin-top:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+                    <div style="font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Preview: How names will be replaced</div>
+                    <div id="preview-list" style="font-size:12px;line-height:1.8;color:var(--text);max-height:120px;overflow-y:auto"></div>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button id="applyNameLabels" style="padding:10px 16px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--bg);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer">Proceed</button>
+                </div>
+            `;
+            modal.innerHTML = html;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const listEl = modal.querySelector('#name-assignments-list');
+            assignments.forEach((item, idx) => {
+                const caseStr = item.cases.join(', ');
+                const row = document.createElement('div');
+                row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                row.innerHTML = `
+                    <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.name}">${item.name}</div>
+                    <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${caseStr}">${caseStr}</div>
+                    <select data-idx="${idx}" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center">
+                        <option value="skip">— Skip —</option>
+                        <option value="witness">Witness</option>
+                        <option value="poi">POI</option>
+                        <option value="client">Client</option>
+                        <option value="victim">Victim</option>
+                    </select>
+                    <input type="number" min="1" data-idx="${idx}" placeholder="auto" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%">
+                `;
+                listEl.appendChild(row);
+
+                // Attach listeners directly to this row's controls
+                const sel = row.querySelector('select');
+                const num = row.querySelector('input');
+                sel.addEventListener('change', () => {
+                    const i = parseInt(sel.dataset.idx);
+                    assignments[i].label = sel.value;
+                    updatePreview();
+                });
+                num.addEventListener('input', () => {
+                    const i = parseInt(num.dataset.idx);
+                    const val = parseInt(num.value);
+                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
+                    updatePreview();
+                });
+            });
+
+
+            function updatePreview() {
+                const previewEl = modal.querySelector('#preview-list');
+                if (!previewEl) return;
+                
+                // Compute effective numbers (auto-increment for entries without custom number)
+                const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
+                const effectiveAssignments = assignments.map(item => {
+                    if (item.label === 'skip') {
+                        return { ...item, effectiveNum: null };
+                    }
+                    if (item.customNum && item.customNum > 0) {
+                        return { ...item, effectiveNum: item.customNum };
+                    } else {
+                        counters[item.label] += 1;
+                        return { ...item, effectiveNum: counters[item.label] };
+                    }
+                });
+
+                let html = '';
+                effectiveAssignments.forEach(({ name, label, effectiveNum }) => {
+                    if (label === 'skip') {
+                        html += `<div>${name} → <span style="color:var(--muted)">(skipped)</span></div>`;
+                        return;
+                    }
+                    const displayNum = effectiveNum !== null ? effectiveNum : 'auto';
+                    html += `<div>${name} → <strong>${label.charAt(0).toUpperCase() + label.slice(1)} ${displayNum}</strong></div>`;
+                });
+                previewEl.innerHTML = html;
+            }
+
+            // Initial preview
+            updatePreview();
+
+            document.getElementById('applyNameLabels').onclick = () => {
+                // Read selections and custom numbers
+                assignments.forEach((item, idx) => {
+                    const sel = modal.querySelector(`select[data-idx="${idx}"]`);
+                    const numInput = modal.querySelector(`input[data-idx="${idx}"]`);
+                    item.label = sel.value;
+                    item.customNum = numInput ? (parseInt(numInput.value) || null) : null;
+                });
+                overlay.remove();
+
+                // Determine final numbers (use custom if provided, else auto-increment)
+                const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
+                assignments.forEach(item => {
+                    if (item.label === 'skip') return;
+                    if (item.customNum && item.customNum > 0) {
+                        item.finalNum = item.customNum;
+                    } else {
+                        counters[item.label] += 1;
+                        item.finalNum = counters[item.label];
+                    }
+                });
+
+                // Validate: ensure same (label, number) not given to two different names in same case
+                const used = {}; // caseNum -> Map<"label|num", name>
+                for (const { name, label, finalNum, cases } of assignments) {
+                    if (label === 'skip') continue;
+                    const key = `${label}|${finalNum}`;
+                    for (const caseNum of cases) {
+                        if (!used[caseNum]) used[caseNum] = new Map();
+                        const existing = used[caseNum].get(key);
+                        if (existing && existing !== name) {
+                            alert(`⚠️ Conflict: ${label} ${finalNum} is already assigned to "${existing}" in case ${caseNum}. Cannot assign to "${name}".\n\nPlease change the number for "${name}" or use a different label.`);
+                            return; // abort apply
+                        }
+                        used[caseNum].set(key, name);
+                    }
+                }
+
+                // Apply replacements
+                assignments.forEach(({ name, label, finalNum }) => {
+                    if (label === 'skip') return;
+                    const replacement = `${label.charAt(0).toUpperCase() + label.slice(1)} ${finalNum}`;
+                    rows.forEach(({ element }) => {
+                        element.textContent = element.textContent.replace(name, replacement);
+                    });
+                });
+
+                saveInvoiceData();
+                alert('Names converted successfully.');
+            };
+        }
+
+        // Confirm modal functions
+        function showConfirmModal(message) {
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+                document.getElementById('confirm-message').textContent = message;
+                document.getElementById('confirm-modal').style.display = 'flex';
+            });
+        }
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            if (confirmResolve) confirmResolve(false);
+            confirmResolve = null;
+        }
+        function confirmYes() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            if (confirmResolve) confirmResolve(true);
+            confirmResolve = null;
+        }
+
+        function exportToJson() {
+            const invoiceState = getInvoiceState();
+
+            const dataStr = JSON.stringify(invoiceState, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const pae = document.getElementById('field-pae').textContent.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            link.download = `invoice_backup_${pae || 'data'}.json`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function resetForm() {
+            if (!confirm("Are you sure you want to clear all data? This will wipe the memory and the screen.")) return;
+            document.querySelectorAll('tbody').forEach(tb => tb.innerHTML = '');
+            localStorage.removeItem('invoiceData');
+            window.location.reload();
+        }
+
+        function normalizeCategory(cat) {
+            if (!cat) return "";
+            const c = cat.toLowerCase();
+            if (c.includes('mileage')) return 'mileage';
+            if (c.includes('investigator service')) return 'hours';
+            if (c.includes('out of pocket')) return 'expenses';
+            return 'hours';
+        }
+
+        function handleDataImport(rawText) {
+            if (!rawText || !rawText.trim()) return;
+            
+            // Try to extract header info first (e.g. if the whole form was pasted)
+            extractHeaderInfo(rawText);
+
+            // Split on newline, keep empty lines for index alignment
+            const lines = rawText.split('\n');
+            let importCount = 0;
+            let firstInvestigator = null; // Capture from TLI rows
+
+            lines.forEach((line, index) => {
+                if (!line.trim()) return;
+                // Detect and skip TLI Log header if present
+                if (line.includes("Logged At") && line.includes("Tenths of Hours")) return;
+
+                let cols = line.split('\t'); // Google Sheets/Excel default
+                if (cols.length < 2) cols = line.split(',');
+                
+                if (cols.length < 2) return;
+
+                // Pad or trim cols to expected lengths for each format
+                const isLegacyHours = cols.length === 5;
+                const isLegacyMileage = cols.length === 4;
+                const isLegacyExpenses = cols.length === 6;
+                const isTLI = cols.length >= 12; // Accept TLI-like rows (pad to 16)
+
+                if (isTLI) {
+                    // Pad missing trailing columns (empty cells collapse on split)
+                    while (cols.length < 16) cols.push('');
+                    const caseNumber = cols[1].trim() || "Unspecified";
+                    const date = cols[5].trim();
+                    const category = cols[4].trim();
+                    const investigator = cols[14] ? cols[14].trim() : '';
+                    // Capture first investigator encountered
+                    if (investigator && !firstInvestigator) {
+                        firstInvestigator = investigator;
+                    }
+                    const hours = parseFloat(cols[8]) || 0;
+                    const qty = parseFloat(cols[10]) || 0;
+                    const miles = parseFloat(cols[11]) || 0;
+                    const description = cols[15] ? cols[15].trim() : '';
+                    let route = `${cols[12].trim()} → ${cols[13].trim()}`;
+                    if (investigator) {
+                        route += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Driver: ${investigator})`;
+                    }
+
+                    const type = normalizeCategory(category);
+
+                    if (hours > 0 || (type === 'hours' && qty > 0)) {
+                        const tbody = document.getElementById('table-hours').querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 4);
+                        const displayHours = hours > 0 ? hours : qty;
+                        const cleanedCategory = category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                            .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
+                            .replace(/witness development & interviews/gi, 'Witness Interviews')
+                            .replace(/case intake & file audit/gi, 'Case Intake and Audit')
+                            .trim();
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
+                        importCount++;
+                    }
+                    if (miles > 0) {
+                        const tbody = document.getElementById('table-mileage').querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 3);
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
+                        importCount++;
+                    }
+                    if (type === 'expenses' || (qty > 0 && hours === 0 && miles === 0)) {
+                        const tbody = document.getElementById('table-expenses').querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 5);
+                        
+                        let amount = 0;
+                        const catLower = category.toLowerCase();
+                        if (catLower.includes('photocopy') || catLower.includes('copies')) {
+                            const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                            amount = qty * rate;
+                        }
+
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim()}</td><td contenteditable="true">${description}</td><td contenteditable="true">${qty}</td><td class="amount-col" contenteditable="true">$${amount.toFixed(2)}</td></tr>`);
+                        importCount++;
+                    }
+                } else {
+                    // Legacy chunk-paste logic
+                    const caseNumber = cols[0].trim();
+                    if (!caseNumber) return;
+
+                    let targetTableId = '';
+                    let rowHtml = '';
+                    let colSpanData = 0;
+
+                    if (cols.length === 5) { // Hours: [Case, Date, Category, Description, Hours]
+                        targetTableId = 'table-hours';
+                        const cleanedCategory = cols[3].replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                            .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
+                            .replace(/witness development & interviews/gi, 'Witness Interviews')
+                            .replace(/case intake & file audit/gi, 'Case Intake and Audit')
+                            .trim();
+                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedCategory}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
+                        colSpanData = 4;
+                        importCount++;
+                    } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
+                        targetTableId = 'table-mileage';
+                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
+                        colSpanData = 3;
+                        importCount++;
+                    } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amt]
+                        targetTableId = 'table-expenses';
+                        const cleanedCategory = cols[2].replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim();
+                        
+                        let amt = cols[5];
+                        const catLower = cols[2].toLowerCase();
+                        if (amt.includes('0.00') && (catLower.includes('photocopy') || catLower.includes('copies'))) {
+                             const qty = parseFloat(cols[4]) || 0;
+                             const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                             amt = '$' + (qty * rate).toFixed(2);
+                        }
+
+                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
+                        colSpanData = 5;
+                        importCount++;
+                    }
+
+                    if (targetTableId) {
+                        const tbody = document.getElementById(targetTableId).querySelector('tbody');
+                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, colSpanData);
+                        subtotalRow.insertAdjacentHTML('beforebegin', rowHtml);
+                    }
+                }
+            });
+
+            // Set investigator from paste if not already filled
+            if (firstInvestigator) {
+                const invField = document.getElementById('field-investigator');
+                if (invField && (invField.textContent.trim() === '' || invField.textContent.includes('enter'))) {
+                    invField.textContent = firstInvestigator;
+                }
+            }
+
+            // Default invoice date to today if still empty
+            const invDateField = document.getElementById('field-invoice-date');
+            if (invDateField) {
+                const current = invDateField.textContent.trim();
+                if (!current || current.includes('enter')) {
+                    const today = new Date();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const yyyy = today.getFullYear();
+                    invDateField.textContent = `${mm}/${dd}/${yyyy}`;
+                }
+            }
+
+            if (importCount > 0) {
+                updateInvoiceTotals();
+                saveInvoiceData();
+                document.getElementById('paste-area').value = ''; 
+                const indicator = document.getElementById('save-indicator');
+                indicator.textContent = `✔ Imported ${importCount} items`;
+                indicator.classList.add('visible');
+                setTimeout(() => indicator.classList.remove('visible'), 3000);
+            }
+        }
+
+        async function handlePdfFile(file) {
+            try {
+                // Clear previous PAE-related fields
+                const paeFields = ['field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth', 'field-pae', 'field-pae-expiration'];
+                paeFields.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '';
+                });
+
+                // Clear only line item tables (totals table will be recalculated)
+                document.querySelectorAll('#table-hours tbody, #table-mileage tbody, #table-expenses tbody').forEach(tbody => tbody.innerHTML = '');
+
+                // Show a loading indicator here if desired
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdf = await loadingTask.promise;
+                let fullText = "";
+                for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                }
+                const extracted = extractHeaderInfo(fullText);
+                // Always recalc totals after clearing tables, even if no header fields were extracted
+                updateInvoiceTotals();
+                if (extracted) {
+                    saveInvoiceData();
+                }
+            } catch (error) { console.error('PDF Scan Error:', error); }
+        }
+
+        function invoiceHasData() {
+            // Check header fields for non-placeholder content
+            const headerIds = [
+                'field-client', 'field-case', 'field-attorney', 'field-pae',
+                'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range'
+            ];
+            for (const id of headerIds) {
+                const el = document.getElementById(id);
+                if (el) {
+                    const txt = el.textContent.trim();
+                    if (txt && !txt.includes('enter') && !txt.includes('Drop') && !txt.includes('click here')) {
+                        return true;
+                    }
+                }
+            }
+            // Check if any line items exist in tables
+            if (document.querySelectorAll('.case-header').length > 0) return true;
+            return false;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Load the data from storage first
+            loadInvoiceData();
+            
+            // 2. Only calculate totals once the DOM has been populated
+            // This prevents a blank "auto-save" from overwriting your data
+            updateInvoiceTotals();
+
+            const pasteArea = document.getElementById('paste-area');
+            
+            // Use the specific paste event which is more reliable for large spreadsheet data
+            pasteArea.addEventListener('paste', async (e) => {
+                const text = (e.clipboardData || window.clipboardData).getData('Text');
+                if (text) {
+                    // If invoice already has data, ask before adding more
+                    if (document.querySelectorAll('.case-header').length > 0) {
+                        const confirmed = await showConfirmModal("Invoice already contains data. Add these new entries to the existing invoice?");
+                        if (!confirmed) {
+                            pasteArea.value = '';
+                            return;
+                        }
+                    }
+                    setTimeout(() => handleDataImport(text), 50);
+                }
+            });
+
+            // Drag and Drop support
+            pasteArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                pasteArea.style.borderColor = '#0066cc';
+            });
+            pasteArea.addEventListener('dragleave', () => pasteArea.style.borderColor = '#ddd');
+            pasteArea.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+                
+                // Always clear paste area on drop
+                pasteArea.value = '';
+                
+                if (file.type === "application/pdf" || file.name.toLowerCase().endsWith('.pdf')) {
+                    // PAE drop: only ask to replace if invoice already has meaningful data
+                    if (invoiceHasData()) {
+                        const confirmed = await showConfirmModal("Replace current invoice with this PAE? All existing entries will be cleared.");
+                        if (!confirmed) return;
+                    }
+                    handlePdfFile(file);
+                } else {
+                    // Data paste/drop: ask to add to existing (if any rows exist)
+                    if (document.querySelectorAll('.case-header').length > 0) {
+                        const confirmed = await showConfirmModal("Invoice already contains data. Add these new entries to the existing invoice?");
+                        if (!confirmed) return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => handleDataImport(ev.target.result.replace(/,/g, '\t'));
+                    reader.readAsText(file);
+                }
+            });
+
+            document.getElementById('pdf-input').addEventListener('change', (e) => {
+                if (e.target.files[0]) handlePdfFile(e.target.files[0]);
+            });
+
+            document.getElementById('json-input').addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const text = await file.text();
+                    applyInvoiceState(JSON.parse(text));
+                    saveInvoiceData();
+                    e.target.value = ''; // Reset input
+                }
+            });
+
+            // Use Event Delegation for all inputs and contenteditables
+            // This ensures dynamically added rows still trigger saves
+            document.body.addEventListener('input', (e) => {
+                if (e.target.matches('input, [contenteditable="true"]')) {
+                    updateInvoiceTotals();
+                }
+            });
+
+            document.body.addEventListener('blur', (e) => {
+                if (e.target.matches('td[contenteditable="true"]')) {
+                    updateInvoiceTotals();
+                }
+            }, true); // Use capture phase for blur as it doesn't bubble
+
+            // Make Settings modal draggable and resizable
+            const modal = document.getElementById('settings-modal');
+            const modalContent = modal.querySelector('.modal-content');
+            const header = modal.querySelector('.modal-header');
+            let isDragging = false, isResizing = false;
+            let offsetX, offsetY, startX, startY, startWidth, startHeight;
+
+            header.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = modalContent.getBoundingClientRect();
+                offsetX = startX - rect.left;
+                offsetY = startY - rect.top;
+                header.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const newX = e.clientX - offsetX;
+                    const newY = e.clientY - offsetY;
+                    modalContent.style.left = newX + 'px';
+                    modalContent.style.top = newY + 'px';
+                    modalContent.style.transform = 'none';
+                    modalContent.style.right = 'auto';
+                    modalContent.style.bottom = 'auto';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    header.style.cursor = 'grab';
+                }
+            });
+
+            // Resize handle: add a div at bottom-right corner
+            const resizeHandle = document.createElement('div');
+            resizeHandle.style.cssText = 'position: absolute; bottom: 0; right: 0; width: 15px; height: 15px; cursor: se-resize; background: linear-gradient(135deg, transparent 50%, var(--border) 50%); border-bottom-right-radius: 8px;';
+            modalContent.appendChild(resizeHandle);
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = modalContent.offsetWidth;
+                startHeight = modalContent.offsetHeight;
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isResizing) {
+                    const width = startWidth + (e.clientX - startX);
+                    const height = startHeight + (e.clientY - startY);
+                    modalContent.style.width = Math.max(600, width) + 'px';
+                    modalContent.style.height = Math.max(400, height) + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+            });
+
+            // Initial drag handle cursor on header
+            header.style.cursor = 'grab';
+
+            // Temperature help popup toggle
+            const tempHelpIcon = document.getElementById('temp-help-icon');
+            const tempHelpPopup = document.getElementById('temp-help-popup');
+            if (tempHelpIcon && tempHelpPopup) {
+                tempHelpIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isVisible = tempHelpPopup.style.display === 'block';
+                    tempHelpPopup.style.display = isVisible ? 'none' : 'block';
+                    // Position near the icon
+                    const rect = tempHelpIcon.getBoundingClientRect();
+                    tempHelpPopup.style.left = (rect.left - 100) + 'px';
+                    tempHelpPopup.style.top = (rect.bottom + 5) + 'px';
+                });
+                // Hide when clicking elsewhere
+                document.addEventListener('click', () => {
+                    tempHelpPopup.style.display = 'none';
+                });
+                tempHelpPopup.addEventListener('click', (e) => e.stopPropagation());
+            }
+        });
+    </script>
+</body>
+</html>
