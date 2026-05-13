@@ -2103,12 +2103,27 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                          rowHtml = `<tr class="${rateClass}"><td contenteditable="true">${dateVal}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedCategory}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
                          colSpanData = 4;
                          importCount++;
+                     } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
+                         targetTableId = 'table-mileage';
+                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
+                         colSpanData = 3;
+                         importCount++;
+                     } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amt]
+                         targetTableId = 'table-expenses';
+                         const cleanedCategory = cols[2].replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim();
+                         
+                         let amt = cols[5];
+                         const catLower = cols[2].toLowerCase();
+                         if (amt === '$0.00' || amt === '' || (catLower.includes('photocopy') || catLower.includes('copies'))) {
+                              const qty = parseFloat(cols[4]) || 0;
+                              const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                              amt = '$' + (qty * rate).toFixed(2);
+                         }
+                         
+                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
+                         colSpanData = 5;
+                         importCount++;
                      }
-
-                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
-                        colSpanData = 5;
-                        importCount++;
-                    }
 
                     if (targetTableId) {
                         const tbody = document.getElementById(targetTableId).querySelector('tbody');
