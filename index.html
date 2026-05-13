@@ -1533,16 +1533,21 @@ RULES:
    - J Smith / J. Smith
    - casing differences
 
-3. Do NOT:
+3. RELATED PAIR PATTERN: If a line contains two first names joined by "and" followed by a shared last name, split into two separate full names.
+   Pattern: "FirstName1 and FirstName2 LastName" → "FirstName1 LastName" + "FirstName2 LastName"
+   Example: "Alex and Jordan Taylor" → "Alex Taylor", "Jordan Taylor"
+   Apply only when exactly two first names with one shared last name at the end.
+
+4. Do NOT:
    - infer identity beyond clear spelling similarity
    - merge different people with similar names
    - assign roles or labels
    - normalize names into a single "correct" version
 
-4. Be conservative:
+5. Be conservative:
    - If not clearly the same name variant, keep separate
 
-5. Exclude non-person entities:
+6. Exclude non-person entities:
    - task labels (Report Writing, OSINT, Attempt Contact, Travel, etc.)
    - locations, organizations, case references
 
