@@ -563,15 +563,8 @@
                          if (!isNaN(date.getTime())) allServiceDates.push(date);
                          if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
                          else caseHours59 += hours;
-                     }
-                         } else {
-                             date = new Date(dateCell); // fallback
-                         }
-                         if (!isNaN(date.getTime())) allServiceDates.push(date);
-                         if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
-                         else caseHours59 += hours;
-                     }
-                    currentRow = currentRow.nextElementSibling;
+                      }
+                     currentRow = currentRow.nextElementSibling;
                 }
                 totalHours55 += caseHours55;
                 totalHours59 += caseHours59;
