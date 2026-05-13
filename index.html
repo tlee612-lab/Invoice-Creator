@@ -153,6 +153,7 @@
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
         .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid var(--accent); }
         .blue-text { color: var(--border); }
+        .rate-55 { color: var(--border); }
         .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border); }
         .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 12px; }
         .total-item { display: flex; justify-content: space-between; padding: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
@@ -2016,18 +2017,35 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
 
                     const type = normalizeCategory(category);
 
-                    if (hours > 0 || (type === 'hours' && qty > 0)) {
-                        const tbody = document.getElementById('table-hours').querySelector('tbody');
-                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 4);
-                        const displayHours = hours > 0 ? hours : qty;
-                        const cleanedCategory = category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
-                            .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
-                            .replace(/witness development & interviews/gi, 'Witness Interviews')
-                            .replace(/case intake & file audit/gi, 'Case Intake and Audit')
-                            .trim();
-                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
-                        importCount++;
-                    }
+                     if (hours > 0 || (type === 'hours' && qty > 0)) {
+                         const tbody = document.getElementById('table-hours').querySelector('tbody');
+                         const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 4);
+                         const displayHours = hours > 0 ? hours : qty;
+                         const cleanedCategory = category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                             .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
+                             .replace(/witness development & interviews/gi, 'Witness Interviews')
+                             .replace(/case intake & file audit/gi, 'Case Intake and Audit')
+                             .trim();
+                         
+                         // Determine if this entry uses the $55/hr rate (date before cutoff)
+                         let rateClass = '';
+                         if (date) {
+                             const parts = date.split(/[-\/]/);
+                             let serviceDate;
+                             if (parts.length === 3) {
+                                 if (parts[0].length === 4) serviceDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                 else serviceDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                             } else {
+                                 serviceDate = new Date(date);
+                             }
+                             if (!isNaN(serviceDate.getTime()) && serviceDate < CONFIG.RATE_CUTOFF_DATE) {
+                                 rateClass = 'rate-55';
+                             }
+                         }
+                         
+                         subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClass}"><td contenteditable="true">${date}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
+                         importCount++;
+                     }
                     if (miles > 0) {
                         const tbody = document.getElementById('table-mileage').querySelector('tbody');
                         const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 3);
