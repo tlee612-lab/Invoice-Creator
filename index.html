@@ -175,7 +175,7 @@
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="active-model-display"></span>
                 <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
-                <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: 2a88f2b</span>
+                <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: &lt;fetching...&gt;</span>
             </div>
         </div>
         <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste a spreadsheet or drop a PAE.</div>
@@ -1883,9 +1883,9 @@ ${payload}`;
                     selectedIndices.clear();
                     updateMergeButton();
                     updatePreview();
-                    mergeOverlay.remove();
-                };
-            }
+                     mergeOverlay.remove();
+                 });
+             }
 
             function updatePreview() {
                 const previewEl = modal.querySelector('#preview-list');
@@ -2405,9 +2405,16 @@ ${payload}`;
                     if (sha) {
                         const el = document.getElementById('git-version');
                         if (el) el.textContent = 'ver: ' + sha;
+                    } else {
+                        const el = document.getElementById('git-version');
+                        if (el) el.textContent = 'ver: unknown';
                     }
                 })
-                .catch(err => console.warn('Could not fetch commit SHA:', err));
+                .catch(err => {
+                    console.warn('Could not fetch commit SHA:', err);
+                    const el = document.getElementById('git-version');
+                    if (el) el.textContent = 'ver: unknown';
+                });
 
             const pasteArea = document.getElementById('paste-area');
             
