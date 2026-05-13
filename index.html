@@ -1656,11 +1656,6 @@ ${payload}`;
                 return;
             }
 
-            // Build generic case number mapping: actual case numbers → Case 1, Case 2, ...
-            const uniqueCases = Array.from(new Set(nameMap.values()).flatMap(c => Array.from(c)));
-            const caseMap = {};
-            uniqueCases.forEach((c, i) => { caseMap[c] = `Case ${i + 1}`; });
-
             // 5. Build assignments array
             const assignments = [];
             nameMap.forEach((cases, name) => {
@@ -1689,10 +1684,9 @@ ${payload}`;
                     For each name found, assign a label and optional number. The name will be replaced with that label in all cases.<br>
                     <strong>Note:</strong> Client and Investigator header fields are never changed.
                 </div>
-                <div style="display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+                <div style="display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
                     <div style="text-align:center">Sel</div>
                     <div>Name</div>
-                    <div>Case(s)</div>
                     <div style="text-align:center">Label</div>
                     <div style="text-align:center">Number</div>
                 </div>
@@ -1715,9 +1709,8 @@ ${payload}`;
             const rowElements = [];
             
             assignments.forEach((item, idx) => {
-                const caseStr = item.cases.map(c => caseMap[c] || c).join(', ');
                 const row = document.createElement('div');
-                row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
                 row.dataset.idx = idx;
                 
                 const checkbox = document.createElement('input');
@@ -1729,11 +1722,6 @@ ${payload}`;
                 nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
                 nameDiv.title = item.name;
                 nameDiv.textContent = item.name;
-                
-                const caseDiv = document.createElement('div');
-                caseDiv.style.cssText = 'font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-                caseDiv.title = caseStr;
-                caseDiv.textContent = caseStr;
                 
                 const select = document.createElement('select');
                 select.dataset.idx = idx;
@@ -1753,7 +1741,7 @@ ${payload}`;
                 numInput.placeholder = 'auto';
                 numInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
                 
-                row.append(checkbox, nameDiv, caseDiv, select, numInput);
+                row.append(checkbox, nameDiv, select, numInput);
                 listEl.appendChild(row);
                 rowElements.push({ row, checkbox, select, numInput, idx });
                 
@@ -1901,9 +1889,8 @@ ${payload}`;
                     assignments.splice(firstIdx, 0, mergedItem);
                     
                     // Re-render row for the merged entry
-                    const caseStr = mergedItem.cases.map(c => caseMap[c] || c).join(', ');
                     const newRow = document.createElement('div');
-                    newRow.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                    newRow.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
                     newRow.dataset.idx = firstIdx;
                     
                     const mergedCheckbox = document.createElement('input');
@@ -1921,11 +1908,6 @@ ${payload}`;
                     mergedNameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
                     mergedNameDiv.title = canonicalName;
                     mergedNameDiv.textContent = canonicalName;
-                    
-                    const mergedCaseDiv = document.createElement('div');
-                    mergedCaseDiv.style.cssText = 'font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-                    mergedCaseDiv.title = caseStr;
-                    mergedCaseDiv.textContent = caseStr;
                     
                     const mergedSelect = document.createElement('select');
                     mergedSelect.dataset.idx = firstIdx;
@@ -1954,7 +1936,7 @@ ${payload}`;
                         updatePreview();
                     });
                     
-                    newRow.append(mergedCheckbox, mergedNameDiv, mergedCaseDiv, mergedSelect, mergedNumInput);
+                    newRow.append(mergedCheckbox, mergedNameDiv, mergedSelect, mergedNumInput);
                     listEl.insertBefore(newRow, listEl.firstChild); // insert at merged position
                     
                     // Update rowElements list
