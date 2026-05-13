@@ -545,26 +545,25 @@
                     const hoursCell = currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0';
                     const hours = parseFloat(hoursCell) || 0;
 
-                    if (dateCell) {
-                        // Parse date as local time (avoid UTC rollover for ISO strings like 2026-05-04)
-                        const parts = dateCell.split(/[-\/]/); // Handle YYYY-MM-DD or MM/DD/YYYY
-                        let date;
-                        if (parts.length === 3) {
-                            // Determine format: if first part is 4 digits, it's YYYY-MM-DD
-                            if (parts[0].length === 4) {
-                                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                            } else {
-                                // MM/DD/YYYY
-                                date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                            }
-                        } else {
-                            date = new Date(dateCell); // fallback
-                        }
-                        if (!isNaN(date.getTime())) allServiceDates.push(date);
-                        const year = date.getFullYear();
-                        if (year === 2025) caseHours55 += hours;
-                        else if (year === 2026) caseHours59 += hours;
-                    }
+                     if (dateCell) {
+                         // Parse date as local time (avoid UTC rollover for ISO strings like 2026-05-04)
+                         const parts = dateCell.split(/[-\/]/); // Handle YYYY-MM-DD or MM/DD/YYYY
+                         let date;
+                         if (parts.length === 3) {
+                             // Determine format: if first part is 4 digits, it's YYYY-MM-DD
+                             if (parts[0].length === 4) {
+                                 date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                             } else {
+                                 // MM/DD/YYYY
+                                 date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                             }
+                         } else {
+                             date = new Date(dateCell); // fallback
+                         }
+                         if (!isNaN(date.getTime())) allServiceDates.push(date);
+                         if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
+                         else caseHours59 += hours;
+                     }
                     currentRow = currentRow.nextElementSibling;
                 }
                 totalHours55 += caseHours55;
@@ -601,23 +600,22 @@
                     const milesCell = currentRow.cells[2] ? currentRow.cells[2].textContent.trim() : '0';
                     const miles = parseFloat(milesCell) || 0;
 
-                    if (dateCell && miles > 0) {
-                        const parts = dateCell.split(/[-\/]/);
-                        let date;
-                        if (parts.length === 3) {
-                            if (parts[0].length === 4) {
-                                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                            } else {
-                                date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                            }
-                        } else {
-                            date = new Date(dateCell);
-                        }
-                        if (!isNaN(date.getTime())) allServiceDates.push(date);
-                        const year = date.getFullYear();
-                        if (year === 2025) caseMiles2025 += miles;
-                        else if (year === 2026) caseMiles2026 += miles;
-                    }
+                     if (dateCell && miles > 0) {
+                         const parts = dateCell.split(/[-\/]/);
+                         let date;
+                         if (parts.length === 3) {
+                             if (parts[0].length === 4) {
+                                 date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                             } else {
+                                 date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                             }
+                         } else {
+                             date = new Date(dateCell);
+                         }
+                         if (!isNaN(date.getTime())) allServiceDates.push(date);
+                         if (date < CONFIG.RATE_CUTOFF_DATE) caseMiles2025 += miles;
+                         else caseMiles2026 += miles;
+                     }
                     currentRow = currentRow.nextElementSibling;
                 }
                 totalMiles2025 += caseMiles2025;
