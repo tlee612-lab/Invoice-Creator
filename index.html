@@ -1523,7 +1523,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 return;
             }
 
-            const prompt = `From the following service descriptions, extract all person names (including witnesses, victims, clients, POIs, investigators, etc.). Names may be capitalized or lowercase. Return ONLY a JSON array of unique name strings, e.g., ["John Smith","Jane Doe"]. Do not include explanations.\n\n${payload}`;
+            const prompt = `From the following service descriptions, extract all person names (witnesses, victims, clients, persons of interest, investigators, etc.). EXCLUDE drivers and transportation personnel. Names may be capitalized or lowercase. Return ONLY a JSON array of unique name strings, e.g., ["John Smith","Jane Doe"]. Do not include explanations.\n\n${payload}`;
 
             let extractedNames = [];
             try {
