@@ -1712,89 +1712,82 @@ ${payload}`;
             let selectedIndices = new Set();
             const rowElements = [];
             
-            assignments.forEach((item, idx) => {
-                const row = document.createElement('div');
-                row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
-                row.dataset.idx = idx;
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'row-select';
-                checkbox.dataset.idx = idx;
-                
-                const nameDiv = document.createElement('div');
-                nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-                nameDiv.title = item.name;
-                nameDiv.textContent = item.name;
-                nameDiv.contentEditable = true;
-                nameDiv.addEventListener('blur', function() {
-                    const newName = this.textContent.trim();
-                    if (newName && newName !== assignments[parseInt(this.closest('[data-idx]').dataset.idx)].name) {
-                        assignments[parseInt(this.closest('[data-idx]').dataset.idx)].name = newName;
-                        updatePreview();
-                    } else {
-                        this.textContent = assignments[parseInt(this.closest('[data-idx]').dataset.idx)].name;
-                    }
-                });
-                
-                const select = document.createElement('select');
-                select.dataset.idx = idx;
-                select.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center';
-                select.innerHTML = `
-                    <option value="skip" ${item.label === 'skip' ? 'selected' : ''}>— Skip —</option>
-                    <option value="witness" ${item.label === 'witness' ? 'selected' : ''}>Witness</option>
-                    <option value="poi" ${item.label === 'poi' ? 'selected' : ''}>POI</option>
-                    <option value="client" ${item.label === 'client' ? 'selected' : ''}>Client</option>
-                    <option value="victim" ${item.label === 'victim' ? 'selected' : ''}>Victim</option>
-                `;
-                
-                const numInput = document.createElement('input');
-                numInput.type = 'number';
-                numInput.min = '1';
-                numInput.value = item.number || '';
-                numInput.placeholder = 'auto';
-                numInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
-                
-                row.append(checkbox, nameDiv, select, numInput);
-                listEl.appendChild(row);
-                rowElements.push({ row, checkbox, select, numInput, idx });
-                
-                checkbox.addEventListener('change', function() {
-                    const i = parseInt(this.dataset.idx);
-                    if (this.checked) selectedIndices.add(i);
-                    else selectedIndices.delete(i);
-                    updateMergeButton();
-                    updatePreview();
-                });
-                select.addEventListener('change', function() {
-                    const i = parseInt(this.dataset.idx);
-                    assignments[i].label = this.value;
-                    updatePreview();
-                });
-                numInput.addEventListener('input', function() {
-                    const i = parseInt(this.dataset.idx);
-                    const val = parseInt(this.value);
-                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
-                    updatePreview();
-                });
-            });
-            
-            function rebuildRowElements() {
-                // Rebuild rowElements from current DOM order and assign sequential indices
-                const rows = Array.from(listEl.querySelectorAll('div[data-idx]'));
+            function renderRows() {
+                listEl.innerHTML = '';
                 rowElements.length = 0;
-                rows.forEach((row, i) => {
-                    const checkbox = row.querySelector('input.row-select');
-                    const select = row.querySelector('select');
-                    const numInput = row.querySelector('input[type="number"]');
-                    row.dataset.idx = i;
-                    if (checkbox) checkbox.dataset.idx = i;
-                    if (select) select.dataset.idx = i;
-                    if (numInput) numInput.dataset.idx = i;
-                    rowElements.push({ row, checkbox, select, numInput, idx: i });
+                assignments.forEach((item, idx) => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                    row.dataset.idx = idx;
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'row-select';
+                    checkbox.dataset.idx = idx;
+                    
+                    const nameDiv = document.createElement('div');
+                    nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                    nameDiv.title = item.name;
+                    nameDiv.textContent = item.name;
+                    nameDiv.contentEditable = true;
+                    nameDiv.addEventListener('blur', function() {
+                        const rowIdx = parseInt(this.closest('[data-idx]').dataset.idx);
+                        const newName = this.textContent.trim();
+                        if (newName && newName !== assignments[rowIdx].name) {
+                            assignments[rowIdx].name = newName;
+                            updatePreview();
+                        } else {
+                            this.textContent = assignments[rowIdx].name;
+                        }
+                    });
+                    
+                    const select = document.createElement('select');
+                    select.dataset.idx = idx;
+                    select.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center';
+                    select.innerHTML = `
+                        <option value="skip" ${item.label === 'skip' ? 'selected' : ''}>— Skip —</option>
+                        <option value="witness" ${item.label === 'witness' ? 'selected' : ''}>Witness</option>
+                        <option value="poi" ${item.label === 'poi' ? 'selected' : ''}>POI</option>
+                        <option value="client" ${item.label === 'client' ? 'selected' : ''}>Client</option>
+                        <option value="victim" ${item.label === 'victim' ? 'selected' : ''}>Victim</option>
+                    `;
+                    
+                    const numInput = document.createElement('input');
+                    numInput.type = 'number';
+                    numInput.min = '1';
+                    numInput.value = item.number || '';
+                    numInput.placeholder = 'auto';
+                    numInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
+                    
+                    row.append(checkbox, nameDiv, select, numInput);
+                    listEl.appendChild(row);
+                    rowElements.push({ row, checkbox, select, numInput, idx });
+                    
+                    checkbox.addEventListener('change', function() {
+                        const i = parseInt(this.dataset.idx);
+                        if (this.checked) selectedIndices.add(i);
+                        else selectedIndices.delete(i);
+                        updateMergeButton();
+                        updatePreview();
+                    });
+                    select.addEventListener('change', function() {
+                        const i = parseInt(this.dataset.idx);
+                        assignments[i].label = this.value;
+                        updatePreview();
+                    });
+                    numInput.addEventListener('input', function() {
+                        const i = parseInt(this.dataset.idx);
+                        const val = parseInt(this.value);
+                        assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
+                        updatePreview();
+                    });
                 });
             }
             
+            renderRows();
+            
+            }
+
             function updateMergeButton() {
                 const mergeBtn = modal.querySelector('#mergeSelectedBtn');
                 if (selectedIndices.size >= 2) {
@@ -1868,111 +1861,32 @@ ${payload}`;
                         return;
                     }
                     
-                    // Remove selected variants and add merged canonical entry
+                    // Collect cases from selected rows
                     const newCases = new Set();
-                    const newLabelOriginal = newLabel; // store before we update assignments
-                    
-                    // Sort selected indices descending to not mess up indexing
-                    const sortedIndices = Array.from(selectedIndices).sort((a,b) => b - a);
-                     for (const idx of sortedIndices) {
-                         const item = assignments[idx];
-                         item.cases.forEach(c => newCases.add(c));
-                         // Remove from assignments
-                         assignments.splice(idx, 1);
-                         // Also remove row element from DOM and rowElements
-                         const entry = rowElements.find(r => r.idx === idx);
-                         if (entry) {
-                             entry.row.remove();
-                             rowElements.splice(rowElements.indexOf(entry), 1);
-                         }
-                         // Update remaining rowElements indices (shift down)
-                         rowElements.forEach(r => { if (r.idx > idx) r.idx--; });
-                     }
-                     
-                     // Renumber data-idx attributes in the DOM to match
-                     rowElements.forEach(r => {
-                         r.checkbox.dataset.idx = r.idx;
-                         r.select.dataset.idx = r.idx;
-                         r.numInput.dataset.idx = r.idx;
-                     });
-                    
-                    // Insert merged canonical entry at the position of the first merged
-                    const mergedItem = {
+                    const selectedArray = Array.from(selectedIndices).sort((a,b) => b - a); // descending for safe removal
+                    for (const idx of selectedArray) {
+                        const item = assignments[idx];
+                        item.cases.forEach(c => newCases.add(c));
+                        assignments.splice(idx, 1);
+                    }
+                    // Insert merged entry at position of first (smallest index)
+                    const insertIdx = Math.min(...selectedIndices);
+                    assignments.splice(insertIdx, 0, {
                         name: canonicalName,
                         cases: Array.from(newCases),
                         label: newLabel,
                         customNum: newNum
-                    };
-                    assignments.splice(firstIdx, 0, mergedItem);
-                    
-                    // Re-render row for the merged entry
-                    const newRow = document.createElement('div');
-                    newRow.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
-                    newRow.dataset.idx = firstIdx;
-                    
-                    const mergedCheckbox = document.createElement('input');
-                    mergedCheckbox.type = 'checkbox';
-                    mergedCheckbox.className = 'row-select';
-                    mergedCheckbox.dataset.idx = firstIdx;
-                    mergedCheckbox.addEventListener('change', () => {
-                        if (mergedCheckbox.checked) selectedIndices.add(firstIdx);
-                        else selectedIndices.delete(firstIdx);
-                        updateMergeButton();
-                        updatePreview();
                     });
                     
-                    const mergedNameDiv = document.createElement('div');
-                    mergedNameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-                    mergedNameDiv.title = canonicalName;
-                    mergedNameDiv.textContent = canonicalName;
-                    
-                    const mergedSelect = document.createElement('select');
-                    mergedSelect.dataset.idx = firstIdx;
-                    mergedSelect.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center';
-                    mergedSelect.innerHTML = `
-                        <option value="skip" ${newLabel === 'skip' ? 'selected' : ''}>— Skip —</option>
-                        <option value="witness" ${newLabel === 'witness' ? 'selected' : ''}>Witness</option>
-                        <option value="poi" ${newLabel === 'poi' ? 'selected' : ''}>POI</option>
-                        <option value="client" ${newLabel === 'client' ? 'selected' : ''}>Client</option>
-                        <option value="victim" ${newLabel === 'victim' ? 'selected' : ''}>Victim</option>
-                    `;
-                    mergedSelect.addEventListener('change', () => {
-                        assignments[firstIdx].label = mergedSelect.value;
-                        updatePreview();
-                    });
-                    
-                    const mergedNumInput = document.createElement('input');
-                    mergedNumInput.type = 'number';
-                    mergedNumInput.min = '1';
-                    mergedNumInput.value = newNum || '';
-                    mergedNumInput.placeholder = 'auto';
-                    mergedNumInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
-                    mergedNumInput.addEventListener('input', () => {
-                        const val = parseInt(mergedNumInput.value);
-                        assignments[firstIdx].customNum = isNaN(val) || val < 1 ? null : val;
-                        updatePreview();
-                    });
-                    
-                    newRow.append(mergedCheckbox, mergedNameDiv, mergedSelect, mergedNumInput);
-                    listEl.insertBefore(newRow, listEl.firstChild); // insert at merged position
-                    
-                    // Update rowElements list
-                    const existingIdx = rowElements.findIndex(r => r.idx === firstIdx);
-                    if (existingIdx >= 0) {
-                        rowElements[existingIdx] = { row: newRow, checkbox: mergedCheckbox, select: mergedSelect, numInput: mergedNumInput, idx: firstIdx };
-                    }
-                    
-                     selectedIndices.clear();
-                     rebuildRowElements();
-                     updateMergeButton();
-                     updatePreview();
-                     mergeOverlay.remove();
+                    // Rebuild modal rows from scratch
+                    renderRows();
+                    selectedIndices.clear();
+                    updateMergeButton();
+                    updatePreview();
+                    mergeOverlay.remove();
                 };
-                mergeOverlay.addEventListener('click', (e) => {
-                    if (e.target === mergeOverlay) mergeOverlay.remove();
-                });
-            });
-            
+            }
+
             function updatePreview() {
                 const previewEl = modal.querySelector('#preview-list');
                 if (!previewEl) return;
