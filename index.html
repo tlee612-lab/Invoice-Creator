@@ -394,8 +394,9 @@
                 <div class="section-title">Client Information</div>
                 <div class="client-info">
                     <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">click here</span><br>
-                    <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">click here</span><br>
-                    <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">click here</span><br>
+                     <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">click here</span><br>
+                     <strong>Case Type:</strong> <span id="field-case-type" class="placeholder-bg" contenteditable="true">click here</span><br>
+                     <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">click here</span><br>
                     <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">click here</span><br>
                 </div>
             </div>
@@ -788,8 +789,9 @@
         // Shared logic to extract header info from text (PDF or Paste)
         function extractHeaderInfo(fullText) {
             const patterns = {
-                client: /Client:\s*([^:\n]+?)(?=Case|Attorney|PAE|PA|County|$)/i,
+                client: /Client:\s*([^\n]+?)(?=\s*(?:Case|Attorney|PAE)\b|$)/i,
                 case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*\d[A-Za-z0-9-]*)/i,
+                caseType: /Case\s+Type:\s*([^\n]+)/i,
                 attorney: /Attorney:\s*([^\n]*?)(?=\s*(?:Authorization|Client|Case|PAE)\b|$)/i,
                 pae: /(?:Authorization\s*No|PAE|PA)\s*(?:#|No\.?|Number)?\s*:?\s*(\d+)/i,
                 'trav-costs': /Est\.?\s*Trav(?:el)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
@@ -855,7 +857,7 @@
             // Save header fields
             const headerFields = [
                 'field-pae-header', 'field-trav-costs', 'field-auth-serv', 'field-auth-hours', 'field-total-auth',
-                'field-client', 'field-case', 'field-attorney', 'field-pae', 'field-pae-effective', 'field-pae-expiration',
+                'field-client', 'field-case', 'field-case-type', 'field-attorney', 'field-pae', 'field-pae-effective', 'field-pae-expiration',
                 'field-investigator', 'field-invoice-num', 'field-invoice-date', 'field-date-range',
                 'field-grand-total'
             ];
