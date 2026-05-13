@@ -782,7 +782,7 @@
             rebuildCaseLabels();
         }
 
-        // Anonymize case headers: replace actual case numbers with CS 1, CS 2, ...
+        // Anonymize case headers: replace actual case numbers with Case 1, Case 2, ...
         function rebuildCaseLabels() {
             const headers = document.querySelectorAll('.case-header');
             const labelMap = new Map();
@@ -790,7 +790,7 @@
             headers.forEach(header => {
                 const caseId = header.dataset.caseId;
                 if (!labelMap.has(caseId)) {
-                    labelMap.set(caseId, `CS ${counter++}`);
+                    labelMap.set(caseId, `Case ${counter++}`);
                 }
                 const colSpan = header.cells[0].colSpan;
                 header.innerHTML = `<td colspan="${colSpan}">${labelMap.get(caseId)}</td>`;
