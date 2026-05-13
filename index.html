@@ -1722,20 +1722,10 @@ ${payload}`;
                 checkbox.className = 'row-select';
                 checkbox.dataset.idx = idx;
                 
-                    const nameDiv = document.createElement('div');
-                    nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-                    nameDiv.title = item.name;
-                    nameDiv.textContent = item.name;
-                    nameDiv.contentEditable = true;
-                    nameDiv.addEventListener('blur', function() {
-                        const newName = this.textContent.trim();
-                        if (newName && newName !== assignments[idx].name) {
-                            assignments[idx].name = newName;
-                            updatePreview();
-                        } else {
-                            this.textContent = assignments[idx].name; // revert
-                        }
-                    });
+                const nameDiv = document.createElement('div');
+                nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                nameDiv.title = item.name;
+                nameDiv.textContent = item.name;
                 
                 const select = document.createElement('select');
                 select.dataset.idx = idx;
@@ -1759,22 +1749,19 @@ ${payload}`;
                 listEl.appendChild(row);
                 rowElements.push({ row, checkbox, select, numInput, idx });
                 
-                checkbox.addEventListener('change', function() {
-                    const i = parseInt(this.dataset.idx);
-                    if (this.checked) selectedIndices.add(i);
-                    else selectedIndices.delete(i);
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) selectedIndices.add(idx);
+                    else selectedIndices.delete(idx);
                     updateMergeButton();
                     updatePreview();
                 });
-                select.addEventListener('change', function() {
-                    const i = parseInt(this.dataset.idx);
-                    assignments[i].label = this.value;
+                select.addEventListener('change', () => {
+                    assignments[idx].label = select.value;
                     updatePreview();
                 });
-                numInput.addEventListener('input', function() {
-                    const i = parseInt(this.dataset.idx);
-                    const val = parseInt(this.value);
-                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
+                numInput.addEventListener('input', () => {
+                    const val = parseInt(numInput.value);
+                    assignments[idx].customNum = isNaN(val) || val < 1 ? null : val;
                     updatePreview();
                 });
             });
@@ -1925,16 +1912,6 @@ ${payload}`;
                     mergedNameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
                     mergedNameDiv.title = canonicalName;
                     mergedNameDiv.textContent = canonicalName;
-                    mergedNameDiv.contentEditable = true;
-                    mergedNameDiv.addEventListener('blur', function() {
-                        const newName = this.textContent.trim();
-                        if (newName && newName !== assignments[firstIdx].name) {
-                            assignments[firstIdx].name = newName;
-                            updatePreview();
-                        } else {
-                            this.textContent = assignments[firstIdx].name;
-                        }
-                    });
                     
                     const mergedSelect = document.createElement('select');
                     mergedSelect.dataset.idx = firstIdx;
