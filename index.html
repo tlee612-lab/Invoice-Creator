@@ -395,9 +395,8 @@
                 <div class="client-info">
                     <strong>Client:</strong> <span id="field-client" class="placeholder-bg" contenteditable="true">click here</span><br>
                      <strong>Case #:</strong> <span id="field-case" class="placeholder-bg" contenteditable="true">click here</span><br>
-                     <strong>Case Type:</strong> <span id="field-case-type" class="placeholder-bg" contenteditable="true">click here</span><br>
                      <strong>Attorney:</strong> <span id="field-attorney" class="placeholder-bg" contenteditable="true">click here</span><br>
-                    <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">click here</span><br>
+                     <strong>PAE #:</strong> <span id="field-pae" class="placeholder-bg" contenteditable="true">click here</span>&nbsp;&nbsp;&nbsp;&nbsp; <strong>Case Type:</strong> <span id="field-case-type" class="placeholder-bg" contenteditable="true">click here</span><br>
                 </div>
             </div>
             <div class="invoice-details">
@@ -789,7 +788,7 @@
         // Shared logic to extract header info from text (PDF or Paste)
         function extractHeaderInfo(fullText) {
             const patterns = {
-                client: /Client:\s*([^\n]+?)(?=\s*(?:Case|Attorney|PAE)\b|$)/i,
+                client: /Client:\s*([^:\n]+?)(?=Case|Attorney|PAE|PA|County|$)/i,
                 case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*\d[A-Za-z0-9-]*)/i,
                 caseType: /Case\s+Type:\s*([^\n]+)/i,
                 attorney: /Attorney:\s*([^\n]*?)(?=\s*(?:Authorization|Client|Case|PAE)\b|$)/i,
