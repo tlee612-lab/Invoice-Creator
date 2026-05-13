@@ -1749,19 +1749,22 @@ ${payload}`;
                 listEl.appendChild(row);
                 rowElements.push({ row, checkbox, select, numInput, idx });
                 
-                checkbox.addEventListener('change', () => {
-                    if (checkbox.checked) selectedIndices.add(idx);
-                    else selectedIndices.delete(idx);
+                checkbox.addEventListener('change', function() {
+                    const i = parseInt(this.dataset.idx);
+                    if (this.checked) selectedIndices.add(i);
+                    else selectedIndices.delete(i);
                     updateMergeButton();
                     updatePreview();
                 });
-                select.addEventListener('change', () => {
-                    assignments[idx].label = select.value;
+                select.addEventListener('change', function() {
+                    const i = parseInt(this.dataset.idx);
+                    assignments[i].label = this.value;
                     updatePreview();
                 });
-                numInput.addEventListener('input', () => {
-                    const val = parseInt(numInput.value);
-                    assignments[idx].customNum = isNaN(val) || val < 1 ? null : val;
+                numInput.addEventListener('input', function() {
+                    const i = parseInt(this.dataset.idx);
+                    const val = parseInt(this.value);
+                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
                     updatePreview();
                 });
             });
