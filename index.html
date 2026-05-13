@@ -1656,6 +1656,11 @@ ${payload}`;
                 return;
             }
 
+            // Build generic case number mapping: actual case numbers → Case 1, Case 2, ...
+            const uniqueCases = Array.from(new Set(nameMap.values()).flatMap(c => Array.from(c)));
+            const caseMap = {};
+            uniqueCases.forEach((c, i) => { caseMap[c] = `Case ${i + 1}`; });
+
             // 5. Build assignments array
             const assignments = [];
             nameMap.forEach((cases, name) => {
@@ -1710,7 +1715,7 @@ ${payload}`;
             const rowElements = [];
             
             assignments.forEach((item, idx) => {
-                const caseStr = item.cases.join(', ');
+                const caseStr = item.cases.map(c => caseMap[c] || c).join(', ');
                 const row = document.createElement('div');
                 row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
                 row.dataset.idx = idx;
@@ -1896,7 +1901,7 @@ ${payload}`;
                     assignments.splice(firstIdx, 0, mergedItem);
                     
                     // Re-render row for the merged entry
-                    const caseStr = mergedItem.cases.join(', ');
+                    const caseStr = mergedItem.cases.map(c => caseMap[c] || c).join(', ');
                     const newRow = document.createElement('div');
                     newRow.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
                     newRow.dataset.idx = firstIdx;
