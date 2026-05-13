@@ -2075,32 +2075,35 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                     let rowHtml = '';
                     let colSpanData = 0;
 
-                    if (cols.length === 5) { // Hours: [Case, Date, Category, Description, Hours]
-                        targetTableId = 'table-hours';
-                        const cleanedCategory = cols[3].replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
-                            .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
-                            .replace(/witness development & interviews/gi, 'Witness Interviews')
-                            .replace(/case intake & file audit/gi, 'Case Intake and Audit')
-                            .trim();
-                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedCategory}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
-                        colSpanData = 4;
-                        importCount++;
-                    } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
-                        targetTableId = 'table-mileage';
-                        rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
-                        colSpanData = 3;
-                        importCount++;
-                    } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amt]
-                        targetTableId = 'table-expenses';
-                        const cleanedCategory = cols[2].replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim();
-                        
-                        let amt = cols[5];
-                        const catLower = cols[2].toLowerCase();
-                        if (amt.includes('0.00') && (catLower.includes('photocopy') || catLower.includes('copies'))) {
-                             const qty = parseFloat(cols[4]) || 0;
-                             const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
-                             amt = '$' + (qty * rate).toFixed(2);
-                        }
+                     if (cols.length === 5) { // Hours: [Case, Date, Category, Description, Hours]
+                         targetTableId = 'table-hours';
+                         const dateVal = cols[1];
+                         const cleanedCategory = cols[3].replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                             .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
+                             .replace(/witness development & interviews/gi, 'Witness Interviews')
+                             .replace(/case intake & file audit/gi, 'Case Intake and Audit')
+                             .trim();
+                         
+                         // Determine $55 rate class
+                         let rateClass = '';
+                         if (dateVal) {
+                             const parts = dateVal.split(/[-\/]/);
+                             let serviceDate;
+                             if (parts.length === 3) {
+                                 if (parts[0].length === 4) serviceDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                 else serviceDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                             } else {
+                                 serviceDate = new Date(dateVal);
+                             }
+                             if (!isNaN(serviceDate.getTime()) && serviceDate < CONFIG.RATE_CUTOFF_DATE) {
+                                 rateClass = 'rate-55';
+                             }
+                         }
+                         
+                         rowHtml = `<tr class="${rateClass}"><td contenteditable="true">${dateVal}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedCategory}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
+                         colSpanData = 4;
+                         importCount++;
+                     }
 
                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
                         colSpanData = 5;
