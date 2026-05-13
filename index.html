@@ -790,7 +790,7 @@
             const patterns = {
                 client: /Client:\s*([^:\n]+?)(?=Case|Attorney|PAE|PA|County|$)/i,
                 case: /(?:Case\s*(?:#|No\.?|Number)?|Matter\s*#?)\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*\d[A-Za-z0-9-]*)/i,
-                attorney: /Attorney:\s*([^\n]+)/i,
+                attorney: /Attorney:\s*([^\n]*?)(?=\s*(?:Authorization|Client|Case|PAE)\b|$)/i,
                 pae: /(?:Authorization\s*No|PAE|PA)\s*(?:#|No\.?|Number)?\s*:?\s*(\d+)/i,
                 'trav-costs': /Est\.?\s*Trav(?:el)?\s*Costs\s*:\s*([\$0-9,.]+)/i,
                 'auth-serv': /Auth(?:orized)?\s*Serv(?:ice)?\s*Amount\s*(?:Not\s*to\s*Exceed)?\s*:\s*([\$0-9,.]+)/i,
