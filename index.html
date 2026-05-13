@@ -1512,58 +1512,44 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 return;
             }
 
-             const prompt = `Extract PERSON NAME STRINGS from structured task log entries and group obvious spelling or format variations.
+             const prompt = `Extract PERSON NAME MENTIONS from structured task log entries.
 
-INPUT:
-A list of task log lines.
-
-GOAL:
-Find all person name mentions and group only clear spelling or formatting variations of the same name.
+This output is used for human review and final determination. The system must be lossless and must NOT interpret identity.
 
 RULES:
 
-1. Extract all name-like strings exactly as written, including:
+1. Extract all text that appears to refer to a person name, including:
    - full names
-   - partial names
+   - first names only
+   - last names only
    - initials
-   - nicknames or aliases if explicitly written
+   - partial or abbreviated forms
 
-2. Group ONLY obvious spelling or formatting variations of the same name, such as:
-   - Leslie Ramono / Leslie Ramano / Leslie Romano
-   - J Smith / J. Smith
-   - casing differences
+2. Preserve names EXACTLY as written in the input.
+   - Do NOT modify spelling
+   - Do NOT normalize
+   - Do NOT expand names
 
-3. RELATED PAIR PATTERN: If a line contains two first names joined by "and" followed by a shared last name, split into two separate full names.
-   Pattern: "FirstName1 and FirstName2 LastName" → "FirstName1 LastName" + "FirstName2 LastName"
-   Example: "Alex and Jordan Taylor" → "Alex Taylor", "Jordan Taylor"
-   Apply only when exactly two first names with one shared last name at the end.
+3. Do NOT perform any of the following:
+   - Do NOT merge name variants
+   - Do NOT infer that similar names refer to the same person
+   - Do NOT attach surnames
+   - Do NOT group or cluster names
+   - Do NOT resolve identities (e.g. Steve vs Steven are separate)
 
-4. Do NOT:
-   - infer identity beyond clear spelling similarity
-   - merge different people with similar names
-   - assign roles or labels
-   - normalize names into a single "correct" version
+4. Extract names even if ambiguous or partial.
+   - If it looks like a person reference, include it.
 
-5. Be conservative:
-   - If not clearly the same name variant, keep separate
+5. Exclude only clearly non-person content:
+   - task labels (e.g. OSINT, Report Writing, Attempt Contact)
+   - locations
+   - organizations
+   - case metadata
 
-6. Exclude non-person entities:
-   - task labels (Report Writing, OSINT, Attempt Contact, Travel, etc.)
-   - locations, organizations, case references
+6. Remove only exact duplicate strings.
 
-OUTPUT FORMAT:
-Write plain text groups.
-
-Format:
-
-Group 1:
-- name variant
-- name variant
-- name variant
-
-Group 2:
-- name variant
-- name variant
+OUTPUT:
+Return ONLY a JSON array of extracted name strings.
 
 INPUT:
 ${payload}`;
