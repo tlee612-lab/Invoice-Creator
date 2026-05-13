@@ -1512,7 +1512,56 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 return;
             }
 
-            const prompt = `From the following service descriptions, extract all person names (witnesses, victims, clients, persons of interest, investigators, etc.). EXCLUDE drivers and transportation personnel. Names may be capitalized or lowercase. Return ONLY a JSON array of unique name strings, e.g., ["John Smith","Jane Doe"]. Do not include explanations.\n\n${payload}`;
+             const prompt = `Extract PERSON NAME STRINGS from structured task log entries and group obvious spelling or format variations.
+
+INPUT:
+A list of task log lines.
+
+GOAL:
+Find all person name mentions and group only clear spelling or formatting variations of the same name.
+
+RULES:
+
+1. Extract all name-like strings exactly as written, including:
+   - full names
+   - partial names
+   - initials
+   - nicknames or aliases if explicitly written
+
+2. Group ONLY obvious spelling or formatting variations of the same name, such as:
+   - Leslie Ramono / Leslie Ramano / Leslie Romano
+   - J Smith / J. Smith
+   - casing differences
+
+3. Do NOT:
+   - infer identity beyond clear spelling similarity
+   - merge different people with similar names
+   - assign roles or labels
+   - normalize names into a single "correct" version
+
+4. Be conservative:
+   - If not clearly the same name variant, keep separate
+
+5. Exclude non-person entities:
+   - task labels (Report Writing, OSINT, Attempt Contact, Travel, etc.)
+   - locations, organizations, case references
+
+OUTPUT FORMAT:
+Write plain text groups.
+
+Format:
+
+Group 1:
+- name variant
+- name variant
+- name variant
+
+Group 2:
+- name variant
+- name variant
+
+INPUT:
+${payload}`;
 
             let extractedNames = [];
             try {
@@ -1630,7 +1679,8 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                     For each name found, assign a label and optional number. The name will be replaced with that label in all cases.<br>
                     <strong>Note:</strong> Client and Investigator header fields are never changed.
                 </div>
-                <div style="display:grid;grid-template-columns:1.5fr 1fr 130px 80px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+                <div style="display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;font-family:var(--ui);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+                    <div style="text-align:center">Sel</div>
                     <div>Name</div>
                     <div>Case(s)</div>
                     <div style="text-align:center">Label</div>
@@ -1642,6 +1692,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                     <div id="preview-list" style="font-size:12px;line-height:1.8;color:var(--text);max-height:120px;overflow-y:auto"></div>
                 </div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button id="mergeSelectedBtn" style="padding:10px 16px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer;display:none">Merge Selected</button>
                     <button id="applyNameLabels" style="padding:10px 16px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--bg);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer">Proceed</button>
                 </div>
             `;
@@ -1650,46 +1701,274 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             document.body.appendChild(overlay);
 
             const listEl = modal.querySelector('#name-assignments-list');
+            let selectedIndices = new Set();
+            const rowElements = [];
+            
             assignments.forEach((item, idx) => {
                 const caseStr = item.cases.join(', ');
                 const row = document.createElement('div');
-                row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
-                row.innerHTML = `
-                    <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.name}">${item.name}</div>
-                    <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${caseStr}">${caseStr}</div>
-                    <select data-idx="${idx}" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center">
-                        <option value="skip">— Skip —</option>
-                        <option value="witness">Witness</option>
-                        <option value="poi">POI</option>
-                        <option value="client">Client</option>
-                        <option value="victim">Victim</option>
-                    </select>
-                    <input type="number" min="1" data-idx="${idx}" placeholder="auto" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%">
+                row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                row.dataset.idx = idx;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'row-select';
+                checkbox.dataset.idx = idx;
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                nameDiv.title = item.name;
+                nameDiv.textContent = item.name;
+                
+                const caseDiv = document.createElement('div');
+                caseDiv.style.cssText = 'font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                caseDiv.title = caseStr;
+                caseDiv.textContent = caseStr;
+                
+                const select = document.createElement('select');
+                select.dataset.idx = idx;
+                select.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center';
+                select.innerHTML = `
+                    <option value="skip" ${item.label === 'skip' ? 'selected' : ''}>— Skip —</option>
+                    <option value="witness" ${item.label === 'witness' ? 'selected' : ''}>Witness</option>
+                    <option value="poi" ${item.label === 'poi' ? 'selected' : ''}>POI</option>
+                    <option value="client" ${item.label === 'client' ? 'selected' : ''}>Client</option>
+                    <option value="victim" ${item.label === 'victim' ? 'selected' : ''}>Victim</option>
                 `;
+                
+                const numInput = document.createElement('input');
+                numInput.type = 'number';
+                numInput.min = '1';
+                numInput.value = item.number || '';
+                numInput.placeholder = 'auto';
+                numInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
+                
+                row.append(checkbox, nameDiv, caseDiv, select, numInput);
                 listEl.appendChild(row);
-
-                // Attach listeners directly to this row's controls
-                const sel = row.querySelector('select');
-                const num = row.querySelector('input');
-                sel.addEventListener('change', () => {
-                    const i = parseInt(sel.dataset.idx);
-                    assignments[i].label = sel.value;
+                rowElements.push({ row, checkbox, select, numInput, idx });
+                
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) selectedIndices.add(idx);
+                    else selectedIndices.delete(idx);
+                    updateMergeButton();
                     updatePreview();
                 });
-                num.addEventListener('input', () => {
-                    const i = parseInt(num.dataset.idx);
-                    const val = parseInt(num.value);
-                    assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
+                select.addEventListener('change', () => {
+                    assignments[idx].label = select.value;
+                    updatePreview();
+                });
+                numInput.addEventListener('input', () => {
+                    const val = parseInt(numInput.value);
+                    assignments[idx].customNum = isNaN(val) || val < 1 ? null : val;
                     updatePreview();
                 });
             });
-
-
+            
+            function rebuildRowElements() {
+                // Rebuild rowElements from current DOM order and assign sequential indices
+                const rows = Array.from(listEl.querySelectorAll('div[data-idx]'));
+                rowElements.length = 0;
+                rows.forEach((row, i) => {
+                    const checkbox = row.querySelector('input.row-select');
+                    const select = row.querySelector('select');
+                    const numInput = row.querySelector('input[type="number"]');
+                    row.dataset.idx = i;
+                    if (checkbox) checkbox.dataset.idx = i;
+                    if (select) select.dataset.idx = i;
+                    if (numInput) numInput.dataset.idx = i;
+                    rowElements.push({ row, checkbox, select, numInput, idx: i });
+                });
+            }
+            
+            function updateMergeButton() {
+                const mergeBtn = modal.querySelector('#mergeSelectedBtn');
+                if (selectedIndices.size >= 2) {
+                    mergeBtn.style.display = 'block';
+                } else {
+                    mergeBtn.style.display = 'none';
+                }
+            }
+            
+            // Merge button opens a sub-modal to set canonical name
+            modal.querySelector('#mergeSelectedBtn').addEventListener('click', () => {
+                if (selectedIndices.size < 2) return;
+                
+                // Build merge modal
+                const mergeOverlay = document.createElement('div');
+                mergeOverlay.className = 'modal-overlay';
+                mergeOverlay.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2001;padding:20px';
+                const mergeModal = document.createElement('div');
+                mergeModal.className = 'modal-content';
+                mergeModal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:500px;width:100%';
+                mergeModal.innerHTML = `
+                    <div style="font-family:var(--ui);font-weight:800;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:16px">Merge Selected Names</div>
+                    <div style="margin-bottom:12px;font-size:12px;color:var(--muted)">
+                        Enter the correct spelling of the name and choose a label/number. All selected name variants will be combined into this single entry.
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:12px;margin-bottom:4px">Canonical Name:</label>
+                        <input type="text" id="merge-canonical" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+                        <div style="font-size:11px;color:var(--muted);margin-top:4px">Suggested: use the most complete/misspelling-free version</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                        <div>
+                            <label style="display:block;font-size:12px;margin-bottom:4px">Label:</label>
+                            <select id="merge-label" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+                                <option value="skip">— Skip —</option>
+                                <option value="witness">Witness</option>
+                                <option value="poi">POI</option>
+                                <option value="client">Client</option>
+                                <option value="victim">Victim</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;margin-bottom:4px">Number (optional):</label>
+                            <input type="number" id="merge-number" min="1" placeholder="auto" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                        <button id="cancelMergeBtn" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer">Cancel</button>
+                        <button id="confirmMergeBtn" style="padding:8px 12px;border-radius:6px;border:2px solid var(--accent);background:var(--accent);color:var(--bg);font-size:12px;font-weight:700;cursor:pointer">Merge</button>
+                    </div>
+                `;
+                mergeOverlay.appendChild(mergeModal);
+                document.body.appendChild(mergeOverlay);
+                
+                // Pre-fill canonical name from first selected item
+                const firstIdx = Array.from(selectedIndices)[0];
+                document.getElementById('merge-canonical').value = assignments[firstIdx].name;
+                
+                const canonicalInput = mergeModal.querySelector('#merge-canonical');
+                const labelSelect = mergeModal.querySelector('#merge-label');
+                const numberInput = mergeModal.querySelector('#merge-number');
+                
+                mergeModal.querySelector('#cancelMergeBtn').onclick = () => mergeOverlay.remove();
+                mergeModal.querySelector('#confirmMergeBtn').onclick = () => {
+                    const canonicalName = canonicalInput.value.trim();
+                    const newLabel = labelSelect.value;
+                    const newNum = parseInt(numberInput.value) || null;
+                    
+                    if (!canonicalName) {
+                        alert('Please enter a name for the merged entry.');
+                        return;
+                    }
+                    
+                    // Remove selected variants and add merged canonical entry
+                    const newCases = new Set();
+                    const newLabelOriginal = newLabel; // store before we update assignments
+                    
+                    // Sort selected indices descending to not mess up indexing
+                    const sortedIndices = Array.from(selectedIndices).sort((a,b) => b - a);
+                     for (const idx of sortedIndices) {
+                         const item = assignments[idx];
+                         item.cases.forEach(c => newCases.add(c));
+                         // Remove from assignments
+                         assignments.splice(idx, 1);
+                         // Also remove row element from DOM and rowElements
+                         const entry = rowElements.find(r => r.idx === idx);
+                         if (entry) {
+                             entry.row.remove();
+                             rowElements.splice(rowElements.indexOf(entry), 1);
+                         }
+                         // Update remaining rowElements indices (shift down)
+                         rowElements.forEach(r => { if (r.idx > idx) r.idx--; });
+                     }
+                     
+                     // Renumber data-idx attributes in the DOM to match
+                     rowElements.forEach(r => {
+                         r.checkbox.dataset.idx = r.idx;
+                         r.select.dataset.idx = r.idx;
+                         r.numInput.dataset.idx = r.idx;
+                     });
+                    
+                    // Insert merged canonical entry at the position of the first merged
+                    const mergedItem = {
+                        name: canonicalName,
+                        cases: Array.from(newCases),
+                        label: newLabel,
+                        customNum: newNum
+                    };
+                    assignments.splice(firstIdx, 0, mergedItem);
+                    
+                    // Re-render row for the merged entry
+                    const caseStr = mergedItem.cases.join(', ');
+                    const newRow = document.createElement('div');
+                    newRow.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 1fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                    newRow.dataset.idx = firstIdx;
+                    
+                    const mergedCheckbox = document.createElement('input');
+                    mergedCheckbox.type = 'checkbox';
+                    mergedCheckbox.className = 'row-select';
+                    mergedCheckbox.dataset.idx = firstIdx;
+                    mergedCheckbox.addEventListener('change', () => {
+                        if (mergedCheckbox.checked) selectedIndices.add(firstIdx);
+                        else selectedIndices.delete(firstIdx);
+                        updateMergeButton();
+                        updatePreview();
+                    });
+                    
+                    const mergedNameDiv = document.createElement('div');
+                    mergedNameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                    mergedNameDiv.title = canonicalName;
+                    mergedNameDiv.textContent = canonicalName;
+                    
+                    const mergedCaseDiv = document.createElement('div');
+                    mergedCaseDiv.style.cssText = 'font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                    mergedCaseDiv.title = caseStr;
+                    mergedCaseDiv.textContent = caseStr;
+                    
+                    const mergedSelect = document.createElement('select');
+                    mergedSelect.dataset.idx = firstIdx;
+                    mergedSelect.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center';
+                    mergedSelect.innerHTML = `
+                        <option value="skip" ${newLabel === 'skip' ? 'selected' : ''}>— Skip —</option>
+                        <option value="witness" ${newLabel === 'witness' ? 'selected' : ''}>Witness</option>
+                        <option value="poi" ${newLabel === 'poi' ? 'selected' : ''}>POI</option>
+                        <option value="client" ${newLabel === 'client' ? 'selected' : ''}>Client</option>
+                        <option value="victim" ${newLabel === 'victim' ? 'selected' : ''}>Victim</option>
+                    `;
+                    mergedSelect.addEventListener('change', () => {
+                        assignments[firstIdx].label = mergedSelect.value;
+                        updatePreview();
+                    });
+                    
+                    const mergedNumInput = document.createElement('input');
+                    mergedNumInput.type = 'number';
+                    mergedNumInput.min = '1';
+                    mergedNumInput.value = newNum || '';
+                    mergedNumInput.placeholder = 'auto';
+                    mergedNumInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
+                    mergedNumInput.addEventListener('input', () => {
+                        const val = parseInt(mergedNumInput.value);
+                        assignments[firstIdx].customNum = isNaN(val) || val < 1 ? null : val;
+                        updatePreview();
+                    });
+                    
+                    newRow.append(mergedCheckbox, mergedNameDiv, mergedCaseDiv, mergedSelect, mergedNumInput);
+                    listEl.insertBefore(newRow, listEl.firstChild); // insert at merged position
+                    
+                    // Update rowElements list
+                    const existingIdx = rowElements.findIndex(r => r.idx === firstIdx);
+                    if (existingIdx >= 0) {
+                        rowElements[existingIdx] = { row: newRow, checkbox: mergedCheckbox, select: mergedSelect, numInput: mergedNumInput, idx: firstIdx };
+                    }
+                    
+                     selectedIndices.clear();
+                     rebuildRowElements();
+                     updateMergeButton();
+                     updatePreview();
+                     mergeOverlay.remove();
+                };
+                mergeOverlay.addEventListener('click', (e) => {
+                    if (e.target === mergeOverlay) mergeOverlay.remove();
+                });
+            });
+            
             function updatePreview() {
                 const previewEl = modal.querySelector('#preview-list');
                 if (!previewEl) return;
                 
-                // Compute effective numbers (auto-increment for entries without custom number)
+                // Compute effective numbers
                 const counters = { witness: 0, poi: 0, client: 0, victim: 0 };
                 const effectiveAssignments = assignments.map(item => {
                     if (item.label === 'skip') {
@@ -1702,7 +1981,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                         return { ...item, effectiveNum: counters[item.label] };
                     }
                 });
-
+                
                 let html = '';
                 effectiveAssignments.forEach(({ name, label, effectiveNum }) => {
                     if (label === 'skip') {
@@ -1714,17 +1993,15 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 });
                 previewEl.innerHTML = html;
             }
-
-            // Initial preview
-            updatePreview();
+            
+             // Initial preview
+             updatePreview();
 
             document.getElementById('applyNameLabels').onclick = () => {
-                // Read selections and custom numbers
-                assignments.forEach((item, idx) => {
-                    const sel = modal.querySelector(`select[data-idx="${idx}"]`);
-                    const numInput = modal.querySelector(`input[data-idx="${idx}"]`);
-                    item.label = sel.value;
-                    item.customNum = numInput ? (parseInt(numInput.value) || null) : null;
+                // Read selections and custom numbers directly from rowElements (keeps in sync)
+                rowElements.forEach(({ idx, select, numInput }) => {
+                    assignments[idx].label = select.value;
+                    assignments[idx].customNum = numInput ? (parseInt(numInput.value) || null) : null;
                 });
                 overlay.remove();
 
