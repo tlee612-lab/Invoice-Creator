@@ -777,6 +777,24 @@
 
             // Auto-save
             saveInvoiceData();
+            
+            // Anonymize case headers
+            rebuildCaseLabels();
+        }
+
+        // Anonymize case headers: replace actual case numbers with CS 1, CS 2, ...
+        function rebuildCaseLabels() {
+            const headers = document.querySelectorAll('.case-header');
+            const labelMap = new Map();
+            let counter = 1;
+            headers.forEach(header => {
+                const caseId = header.dataset.caseId;
+                if (!labelMap.has(caseId)) {
+                    labelMap.set(caseId, `CS ${counter++}`);
+                }
+                const colSpan = header.cells[0].colSpan;
+                header.innerHTML = `<td colspan="${colSpan}">${labelMap.get(caseId)}</td>`;
+            });
         }
 
         // Shared logic to extract header info from text (PDF or Paste)
