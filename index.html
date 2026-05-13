@@ -153,7 +153,7 @@
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
         .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid var(--accent); }
         .blue-text { color: var(--border); }
-        .rate-55 { color: var(--border); }
+        tr.rate-55 td { color: var(--border); }
         .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border); }
         .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 12px; }
         .total-item { display: flex; justify-content: space-between; padding: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
@@ -478,6 +478,30 @@
         // Initialize PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+        let confirmResolve = null;
+
+        // Helper to parse dates consistently without UTC rollover issues
+        function parseLocalDate(dateStr) {
+            if (!dateStr) return new Date(NaN);
+            const parts = dateStr.split(/[-\/]/);
+            if (parts.length === 3) {
+                let year, month, day;
+                if (parts[0].length === 4) {
+                    // YYYY-MM-DD
+                    year = parseInt(parts[0]);
+                    month = parseInt(parts[1]) - 1;
+                    day = parseInt(parts[2]);
+                } else {
+                    // MM/DD/YYYY
+                    year = parseInt(parts[2]);
+                    month = parseInt(parts[0]) - 1;
+                    day = parseInt(parts[1]);
+                }
+                return new Date(year, month, day);
+            }
+            return new Date(dateStr);
+        }
+
         const CONFIG = {
             RATE_EARLY: 55,
             RATE_LATE: 59,
@@ -547,20 +571,8 @@
                     const hours = parseFloat(hoursCell) || 0;
 
                      if (dateCell) {
-                         // Parse date as local time (avoid UTC rollover for ISO strings like 2026-05-04)
-                         const parts = dateCell.split(/[-\/]/); // Handle YYYY-MM-DD or MM/DD/YYYY
-                         let date;
-                         if (parts.length === 3) {
-                             // Determine format: if first part is 4 digits, it's YYYY-MM-DD
-                             if (parts[0].length === 4) {
-                                 date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                             } else {
-                                 // MM/DD/YYYY
-                                 date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                             }
-                         } else {
-                             date = new Date(dateCell); // fallback
-                         }
+                         const date = parseLocalDate(dateCell);
+
                          if (!isNaN(date.getTime())) allServiceDates.push(date);
                          if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
                          else caseHours59 += hours;
@@ -602,17 +614,8 @@
                     const miles = parseFloat(milesCell) || 0;
 
                      if (dateCell && miles > 0) {
-                         const parts = dateCell.split(/[-\/]/);
-                         let date;
-                         if (parts.length === 3) {
-                             if (parts[0].length === 4) {
-                                 date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                             } else {
-                                 date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                             }
-                         } else {
-                             date = new Date(dateCell);
-                         }
+                          const date = parseLocalDate(dateCell);
+
                           if (!isNaN(date.getTime())) allServiceDates.push(date);
                           const year = date.getFullYear();
                           if (year === 2025) caseMiles2025 += miles;
@@ -649,17 +652,8 @@
                     const qty = parseFloat(currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0') || 0;
 
                     if (dateCell) {
-                        const parts = dateCell.split(/[-\/]/);
-                        let date;
-                        if (parts.length === 3) {
-                            if (parts[0].length === 4) {
-                                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                            } else {
-                                date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                            }
-                        } else {
-                            date = new Date(dateCell);
-                        }
+                        const date = parseLocalDate(dateCell);
+
                         if (!isNaN(date.getTime())) allServiceDates.push(date);
                     }
 
@@ -918,11 +912,6 @@
         }
 
         async function analyzeInvoiceAI() {
-            const btn = document.getElementById('btn-ai');
-            if (btn && btn.disabled) {
-                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
-                return;
-            }
             if (!CONFIG.AI_API_KEY) {
                 alert("Please configure the AI API Key in Settings (⚙️).");
                 return;
@@ -1447,7 +1436,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
         }
 
         function updateAIButtonState() {
-            const btn = document.getElementById('btn-ai');
+            const btn = document.getElementById('btn-validate');
             if (btn) {
                 const hasKey = CONFIG.AI_API_KEY && CONFIG.AI_API_KEY.trim().length > 0;
                 const hasModel = CONFIG.AI_MODEL && CONFIG.AI_MODEL.trim().length > 0;
@@ -1805,20 +1794,6 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             // Set inline styles with !important priority
             el.style.setProperty('color', '#000000', 'important');
             el.style.setProperty('background-color', '#ffffff', 'important');
-            el.style.setProperty('border-color', '#000000', 'important');
-            // Recurse into children
-            el.querySelectorAll('*').forEach(child => {
-                child.style.setProperty('color', '#000000', 'important');
-                child.style.setProperty('background-color', '#ffffff', 'important');
-                child.style.setProperty('border-color', '#000000', 'important');
-            });
-        }
-
-        // Apply print-friendly styles recursively with !important to override dark theme
-        function applyPrintStyles(el) {
-            // Set inline styles with !important priority
-            el.style.setProperty('color', '#000000', 'important');
-            el.style.setProperty('background-color', '#ffffff', 'important');
             el.style.setProperty('border', 'none', 'important');
             el.style.setProperty('border-color', 'transparent', 'important');
             el.querySelectorAll('*').forEach(child => {
@@ -1827,15 +1802,6 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 child.style.setProperty('border', 'none', 'important');
                 child.style.setProperty('border-color', 'transparent', 'important');
             });
-        }
-
-        // Get readable field value, skipping placeholder text
-        function getFieldValue(el) {
-            const txt = el.textContent.trim();
-            if (!txt || txt.includes('enter') || txt.includes('Drop') || txt.includes('click here')) {
-                return '';
-            }
-            return txt;
         }
 
         async function downloadPdf() {
@@ -2030,14 +1996,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                          // Determine if this entry uses the $55/hr rate (date before cutoff)
                          let rateClass = '';
                          if (date) {
-                             const parts = date.split(/[-\/]/);
-                             let serviceDate;
-                             if (parts.length === 3) {
-                                 if (parts[0].length === 4) serviceDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                 else serviceDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                             } else {
-                                 serviceDate = new Date(date);
-                             }
+                             const serviceDate = parseLocalDate(date);
                              if (!isNaN(serviceDate.getTime()) && serviceDate < CONFIG.RATE_CUTOFF_DATE) {
                                  rateClass = 'rate-55';
                              }
@@ -2046,13 +2005,23 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                          subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClass}"><td contenteditable="true">${date}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
                          importCount++;
                      }
-                    if (miles > 0) {
-                        const tbody = document.getElementById('table-mileage').querySelector('tbody');
-                        const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 3);
-                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
-                        importCount++;
-                    }
-                    if (type === 'expenses' || (qty > 0 && hours === 0 && miles === 0)) {
+                     if (miles > 0) {
+                         const tbody = document.getElementById('table-mileage').querySelector('tbody');
+                         const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 3);
+                         
+                         // Blue font for 2025 mileage (last year)
+                         let rateClassMileage = '';
+                         if (date) {
+                             const serviceDate = parseLocalDate(date);
+                             if (!isNaN(serviceDate.getTime()) && serviceDate.getFullYear() === 2025) {
+                                 rateClassMileage = 'rate-55';
+                             }
+                         }
+                         
+                         subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClassMileage}"><td contenteditable="true">${date}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
+                         importCount++;
+                      }
+                     if (type === 'expenses' || (qty > 0 && hours === 0 && miles === 0)) {
                         const tbody = document.getElementById('table-expenses').querySelector('tbody');
                         const { subtotalRow } = getOrCreateCaseRows(tbody, caseNumber, 5);
                         
@@ -2078,52 +2047,40 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                      if (cols.length === 5) { // Hours: [Case, Date, Category, Description, Hours]
                          targetTableId = 'table-hours';
                          const dateVal = cols[1];
-                         const cleanedCategory = cols[3].replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
-                             .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
-                             .replace(/witness development & interviews/gi, 'Witness Interviews')
-                             .replace(/case intake & file audit/gi, 'Case Intake and Audit')
-                             .trim();
+                         const cleanedDesc = cols[3].replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
+                             .replace(/discovery analysis & evidence review/gi, 'Discovery/Review').trim();
                          
                          // Determine $55 rate class
                          let rateClass = '';
                          if (dateVal) {
-                             const parts = dateVal.split(/[-\/]/);
-                             let serviceDate;
-                             if (parts.length === 3) {
-                                 if (parts[0].length === 4) serviceDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                 else serviceDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                             } else {
-                                 serviceDate = new Date(dateVal);
-                             }
+                             const serviceDate = parseLocalDate(dateVal);
                              if (!isNaN(serviceDate.getTime()) && serviceDate < CONFIG.RATE_CUTOFF_DATE) {
                                  rateClass = 'rate-55';
                              }
                          }
                          
-                         rowHtml = `<tr class="${rateClass}"><td contenteditable="true">${dateVal}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedCategory}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
+                         rowHtml = `<tr class="${rateClass}"><td contenteditable="true">${dateVal}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedDesc}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
                          colSpanData = 4;
                          importCount++;
-                     } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
-                         targetTableId = 'table-mileage';
-                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
-                         colSpanData = 3;
-                         importCount++;
-                     } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amt]
+                      } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
+                          targetTableId = 'table-mileage';
+                          let rateClassMileage = '';
+                          if (cols[1]) {
+                              const serviceDate = parseLocalDate(cols[1]);
+                              if (!isNaN(serviceDate.getTime()) && serviceDate.getFullYear() === 2025) {
+                                  rateClassMileage = 'rate-55';
+                              }
+                          }
+                          rowHtml = `<tr class="${rateClassMileage}"><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
+                          colSpanData = 3;
+                          importCount++;
+                      } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amount]
                          targetTableId = 'table-expenses';
-                         const cleanedCategory = cols[2].replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim();
-                         
-                         let amt = cols[5];
-                         const catLower = cols[2].toLowerCase();
-                         if (amt === '$0.00' || amt === '' || (catLower.includes('photocopy') || catLower.includes('copies'))) {
-                              const qty = parseFloat(cols[4]) || 0;
-                              const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
-                              amt = '$' + (qty * rate).toFixed(2);
-                         }
-                         
-                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
+                         const amt = cols[5] || '$0.00';
+                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
                          colSpanData = 5;
                          importCount++;
-                     }
+                      }
 
                     if (targetTableId) {
                         const tbody = document.getElementById(targetTableId).querySelector('tbody');
