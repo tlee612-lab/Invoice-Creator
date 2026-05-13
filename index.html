@@ -564,6 +564,13 @@
                          if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
                          else caseHours59 += hours;
                      }
+                         } else {
+                             date = new Date(dateCell); // fallback
+                         }
+                         if (!isNaN(date.getTime())) allServiceDates.push(date);
+                         if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
+                         else caseHours59 += hours;
+                     }
                     currentRow = currentRow.nextElementSibling;
                 }
                 totalHours55 += caseHours55;
@@ -612,9 +619,10 @@
                          } else {
                              date = new Date(dateCell);
                          }
-                         if (!isNaN(date.getTime())) allServiceDates.push(date);
-                         if (date < CONFIG.RATE_CUTOFF_DATE) caseMiles2025 += miles;
-                         else caseMiles2026 += miles;
+                          if (!isNaN(date.getTime())) allServiceDates.push(date);
+                          const year = date.getFullYear();
+                          if (year === 2025) caseMiles2025 += miles;
+                          else if (year === 2026) caseMiles2026 += miles;
                      }
                     currentRow = currentRow.nextElementSibling;
                 }
