@@ -125,7 +125,33 @@
                 white-space: nowrap;
             }
             .subtotal { border-top: 2px solid black !important; border-bottom: 2px solid black !important; }
+            #row-action-bar, .add-row-btn { display: none !important; }
         }
+
+        /* ── Row action bar ───────────────────────────────────────────────────── */
+        #row-action-bar {
+            position: fixed; z-index: 500; display: none;
+            flex-direction: row; align-items: center; gap: 1px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 5px; padding: 2px 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        #row-action-bar button {
+            background: none; border: none; color: var(--muted);
+            cursor: pointer; padding: 2px 6px; font-size: 13px;
+            border-radius: 3px; line-height: 1.5; transition: all 0.15s;
+        }
+        #row-action-bar button:hover { background: var(--surface2); color: var(--accent); }
+        #row-action-bar .bar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 2px; }
+        .add-row-btn {
+            display: block; width: 100%; margin: 3px 0 12px 0;
+            background: none; border: 1px dashed var(--border);
+            color: var(--muted); cursor: pointer; font-size: 12px;
+            padding: 4px 0; border-radius: 4px; text-align: center;
+            transition: all 0.15s;
+        }
+        .add-row-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,200,160,0.05); }
 
         .header { display: flex; align-items: flex-start; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid var(--border); gap: 20px; }
         .vendor-info { margin-left: auto; margin-right: 80px; text-align: left; font-size: 12px; color: var(--muted); white-space: normal; line-height: 1.6; }
@@ -207,6 +233,16 @@
             </div>
             <div id="validation-content" style="font-size:13px;line-height:1.6;color:var(--text);max-height:70vh;overflow-y:auto;white-space:pre-wrap"></div>
         </div>
+    </div>
+
+    <!-- Row Action Bar (floats next to hovered row) -->
+    <div id="row-action-bar">
+        <button id="row-btn-up"   title="Move row up">▲</button>
+        <button id="row-btn-down" title="Move row down">▼</button>
+        <div class="bar-sep"></div>
+        <button id="row-btn-add"  title="Add blank row below">➕</button>
+        <div class="bar-sep"></div>
+        <button id="row-btn-del"  title="Delete row" style="color:#e05">✕</button>
     </div>
 
     <!-- TLI Header Warning Modal -->
@@ -442,6 +478,8 @@
             </tbody>
         </table>
 
+        <button class="add-row-btn" onclick="addRowToTable('table-hours')">➕ Add Service Hours Row</button>
+
         <h2 class="section-heading">MILEAGE</h2>
         <table id="table-mileage">
             <thead>
@@ -452,6 +490,8 @@
             </tbody>
         </table>
 
+        <button class="add-row-btn" onclick="addRowToTable('table-mileage')">➕ Add Mileage Row</button>
+
         <h2 class="section-heading">OUT OF POCKET EXPENSES</h2>
         <table id="table-expenses">
             <thead>
@@ -461,6 +501,8 @@
                 <!-- Case data will be dynamically inserted here -->
             </tbody>
         </table>
+
+        <button class="add-row-btn" onclick="addRowToTable('table-expenses')">➕ Add Expense Row</button>
 
         <h2 class="section-heading">INVOICE TOTALS</h2>
         <table class="invoice-totals-table">
@@ -2696,13 +2738,151 @@ ${payload}`;
             return false;
         }
 
+        // ── Row Management ────────────────────────────────────────────────────────
+        let _rowActionTarget = null;
+        let _rowActionHideTimer = null;
+
+        function setupRowActions() {
+            const bar = document.getElementById('row-action-bar');
+
+            // Delegate mouseover on all three table bodies
+            ['table-hours', 'table-mileage', 'table-expenses'].forEach(tableId => {
+                const tbody = document.getElementById(tableId)?.querySelector('tbody');
+                if (!tbody) return;
+
+                tbody.addEventListener('mouseover', e => {
+                    const tr = e.target.closest('tr');
+                    if (!tr || tr.classList.contains('case-header') || tr.classList.contains('subtotal')) {
+                        clearTimeout(_rowActionHideTimer);
+                        _rowActionHideTimer = setTimeout(() => {
+                            if (!bar.matches(':hover')) hideRowActionBar();
+                        }, 200);
+                        return;
+                    }
+                    clearTimeout(_rowActionHideTimer);
+                    if (tr === _rowActionTarget) return;
+                    _rowActionTarget = tr;
+                    _showRowActionBar(tr);
+                });
+
+                tbody.addEventListener('mouseleave', () => {
+                    clearTimeout(_rowActionHideTimer);
+                    _rowActionHideTimer = setTimeout(() => {
+                        if (!bar.matches(':hover')) hideRowActionBar();
+                    }, 200);
+                });
+            });
+
+            bar.addEventListener('mouseenter', () => clearTimeout(_rowActionHideTimer));
+            bar.addEventListener('mouseleave', () => hideRowActionBar());
+
+            document.getElementById('row-btn-up').addEventListener('click',   () => { rowMoveUp(_rowActionTarget);   });
+            document.getElementById('row-btn-down').addEventListener('click', () => { rowMoveDown(_rowActionTarget); });
+            document.getElementById('row-btn-add').addEventListener('click',  () => { rowAddAfter(_rowActionTarget); });
+            document.getElementById('row-btn-del').addEventListener('click',  () => { rowDelete(_rowActionTarget);   });
+        }
+
+        function _showRowActionBar(tr) {
+            const bar  = document.getElementById('row-action-bar');
+            const rect = tr.getBoundingClientRect();
+            bar.style.display = 'flex';
+            // Position to the right of the row
+            bar.style.top  = Math.round(rect.top + rect.height / 2 - bar.offsetHeight / 2) + 'px';
+            bar.style.left = Math.round(rect.right + 6) + 'px';
+            // If off right edge, flip to left side
+            const bRect = bar.getBoundingClientRect();
+            if (bRect.right > window.innerWidth - 8) {
+                bar.style.left = Math.round(rect.left - bar.offsetWidth - 6) + 'px';
+            }
+        }
+
+        function hideRowActionBar() {
+            document.getElementById('row-action-bar').style.display = 'none';
+            _rowActionTarget = null;
+        }
+
+        function rowMoveUp(tr) {
+            if (!tr) return;
+            const prev = tr.previousElementSibling;
+            if (!prev || prev.classList.contains('case-header')) return;
+            tr.parentNode.insertBefore(tr, prev);
+            _showRowActionBar(tr);
+            updateInvoiceTotals(); saveInvoiceData();
+        }
+
+        function rowMoveDown(tr) {
+            if (!tr) return;
+            const next = tr.nextElementSibling;
+            if (!next || next.classList.contains('subtotal')) return;
+            tr.parentNode.insertBefore(next, tr);
+            _showRowActionBar(tr);
+            updateInvoiceTotals(); saveInvoiceData();
+        }
+
+        function rowDelete(tr) {
+            if (!tr) return;
+            hideRowActionBar();
+            tr.remove();
+            updateInvoiceTotals(); saveInvoiceData();
+        }
+
+        function rowAddAfter(tr) {
+            if (!tr) return;
+            const table  = tr.closest('table');
+            const newRow = _buildBlankRow(table.id);
+            const next   = tr.nextElementSibling;
+            if (next && next.classList.contains('subtotal')) {
+                tr.parentNode.insertBefore(newRow, next);
+            } else {
+                tr.after(newRow);
+            }
+            newRow.querySelector('[contenteditable]')?.focus();
+            _rowActionTarget = newRow;
+            _showRowActionBar(newRow);
+            updateInvoiceTotals(); saveInvoiceData();
+        }
+
+        function _buildBlankRow(tableId) {
+            const tr = document.createElement('tr');
+            if (tableId === 'table-hours') {
+                tr.innerHTML = `<td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td class="hours-col" contenteditable="true">0.0</td>`;
+            } else if (tableId === 'table-mileage') {
+                tr.innerHTML = `<td contenteditable="true"></td><td contenteditable="true"></td><td class="miles-col" contenteditable="true">0.0</td>`;
+            } else if (tableId === 'table-expenses') {
+                tr.innerHTML = `<td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">0</td><td class="amount-col" contenteditable="true">$0.00</td>`;
+            }
+            return tr;
+        }
+
+        function addRowToTable(tableId) {
+            const tbody = document.getElementById(tableId)?.querySelector('tbody');
+            if (!tbody) return;
+            const colSpan = tableId === 'table-mileage' ? 3 : (tableId === 'table-expenses' ? 5 : 4);
+            // Find last subtotal to insert before it; create a default case group if none exist
+            const subtotals = tbody.querySelectorAll('.subtotal');
+            if (subtotals.length === 0) {
+                getOrCreateCaseRows(tbody, 'Unspecified', colSpan);
+            }
+            const lastSubtotal = tbody.querySelector('.subtotal:last-of-type') || tbody.lastElementChild;
+            const newRow = _buildBlankRow(tableId);
+            tbody.insertBefore(newRow, lastSubtotal);
+            newRow.querySelector('[contenteditable]')?.focus();
+            _rowActionTarget = newRow;
+            _showRowActionBar(newRow);
+            updateInvoiceTotals(); saveInvoiceData();
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Load the data from storage first
             loadInvoiceData();
-            
+
             // 2. Only calculate totals once the DOM has been populated
             // This prevents a blank "auto-save" from overwriting your data
             updateInvoiceTotals();
+
+            // 3. Wire up row add/move/delete controls
+            setupRowActions();
 
             // Auto-populate version label from GitHub API (latest commit on main)
             fetch('https://api.github.com/repos/tlee612-lab/Invoice-Creator/commits/main')
