@@ -1162,105 +1162,150 @@
             document.getElementById('ai-menu-modal').style.display = 'none';
         }
 
+        // ── Shared AI helper ──────────────────────────────────────────────────────
+        /**
+         * Call the configured AI provider.
+         * @param {string} systemPrompt
+         * @param {string} userMessage
+         * @param {number} [tokenMultiplier=1]  multiply CONFIG.AI_MAX_TOKENS (use 2 for long outputs)
+         * @returns {Promise<string>} the text response
+         */
+        async function callAI(systemPrompt, userMessage, tokenMultiplier = 1) {
+            const apiKey  = CONFIG.AI_API_KEY.trim();
+            const model   = CONFIG.AI_MODEL;
+            const temp    = CONFIG.AI_TEMPERATURE || 0.7;
+            const tokens  = (CONFIG.AI_MAX_TOKENS || 2048) * tokenMultiplier;
+            const baseUrl = (CONFIG.AI_BASE_URL || '').replace(/\/$/, '');
+
+            let url, headers = { 'Content-Type': 'application/json' }, body;
+
+            if (model.startsWith('gemini')) {
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                body = JSON.stringify({
+                    contents: [{ parts: [{ text: `${systemPrompt}\n\n${userMessage}` }] }],
+                    generationConfig: { temperature: temp, maxOutputTokens: tokens },
+                    safetySettings: [
+                        { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+                        { category: 'HARM_CATEGORY_HATE_SPEECH',        threshold: 'BLOCK_NONE' },
+                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',  threshold: 'BLOCK_NONE' },
+                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT',  threshold: 'BLOCK_NONE' },
+                    ]
+                });
+            } else if (model.startsWith('claude')) {
+                url = 'https://api.anthropic.com/v1/messages';
+                headers['x-api-key'] = apiKey;
+                headers['anthropic-version'] = '2023-06-01';
+                headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                body = JSON.stringify({ model, max_tokens: tokens, temperature: temp,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userMessage }]
+                });
+            } else {
+                // OpenAI-compatible routing
+                if      (model === 'custom')          url = baseUrl ? baseUrl + '/chat/completions' : (() => { throw new Error('Custom endpoint selected but Base URL is empty.'); })();
+                else if (model.startsWith('gpt'))     url = 'https://api.openai.com/v1/chat/completions';
+                else if (model.startsWith('deepseek')) url = 'https://api.deepseek.com/chat/completions';
+                else if (model.includes('sonar'))     url = 'https://api.perplexity.ai/chat/completions';
+                else if (model.startsWith('grok'))    url = 'https://api.x.ai/v1/chat/completions';
+                else                                  url = (baseUrl || 'https://api.openai.com/v1') + '/chat/completions';
+
+                headers['Authorization'] = `Bearer ${apiKey}`;
+                body = JSON.stringify({
+                    model: model === 'custom' ? 'default' : model,
+                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }],
+                    temperature: temp, max_tokens: tokens
+                });
+            }
+
+            const response = await fetch(url, { method: 'POST', headers, body });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error?.message || response.statusText);
+            }
+            const result = await response.json();
+            if (model.startsWith('gemini')) return result.candidates[0].content.parts[0].text;
+            if (model.startsWith('claude')) return result.content[0].text;
+            return result.choices?.[0]?.message?.content || '';
+        }
+
+        /** Build the BILLING RATES section for the validation prompt from live CONFIG. */
+        function buildRatesSection() {
+            const s = CONFIG.RATE_SCHEDULES;
+            const lines = ['BILLING RATES (use these for all totals computations):'];
+            const sorted = arr => [...arr].sort((a, b) => b.effective.localeCompare(a.effective));
+
+            const hourly = sorted(s.hourly || []);
+            hourly.forEach((e, i) => {
+                const prev = hourly[i - 1];
+                lines.push(prev
+                    ? `- Service hours before ${prev.effective}: $${e.rate.toFixed(2)}/hr`
+                    : `- Service hours on/after ${e.effective}: $${e.rate.toFixed(2)}/hr`);
+            });
+
+            const mileage = sorted(s.mileage || []);
+            mileage.forEach((e, i) => {
+                const prev = mileage[i - 1];
+                lines.push(prev
+                    ? `- Mileage before ${prev.effective}: $${e.rate.toFixed(4)}/mi`
+                    : `- Mileage on/after ${e.effective}: $${e.rate.toFixed(4)}/mi`);
+            });
+
+            (s.copies_bw    || []).slice(-1).forEach(e => lines.push(`- B&W copies: $${e.rate.toFixed(2)} each`));
+            (s.copies_color || []).slice(-1).forEach(e => lines.push(`- Color copies: $${e.rate.toFixed(2)} each`));
+            return lines.join('\n');
+        }
+
+        /** Render a structured validation report with styled section headers and color-coded bullets. */
+        function renderValidationReport(text, container) {
+            const lines = text.split('\n');
+            let html = '';
+            for (const raw of lines) {
+                const line = raw.trim();
+                if (!line) { html += '<div style="margin:4px 0"></div>'; continue; }
+
+                if (/^===.*===$/.test(line)) {
+                    const title = line.replace(/^===\s*/, '').replace(/\s*===$/, '');
+                    html += `<div style="font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);margin:16px 0 5px 0;padding-top:10px;border-top:1px solid var(--border)">${title}</div>`;
+                } else if (/^[•\-\*]/.test(line)) {
+                    const content = line.replace(/^[•\-\*]\s*/, '');
+                    const isOk       = /no (issues|errors|duplicates|mismatch|violations|entries|rate error)|complete|verified|plausible|all .*(present|ok|accounted|complete)|not exceeded/i.test(content);
+                    const isCritical = /error|mismatch|exceeded|missing|conflict|outside|orphan|invalid|incomplete|failed|wrong rate/i.test(content);
+                    const color  = isOk ? 'var(--accent)' : isCritical ? '#ff6b6b' : 'var(--text)';
+                    const icon   = isOk ? '✓' : isCritical ? '⚠' : '•';
+                    html += `<div style="display:flex;gap:6px;margin:3px 0 3px 4px;font-size:12px;color:${color}"><span style="flex-shrink:0;font-weight:bold">${icon}</span><span>${content}</span></div>`;
+                } else if (/^(Total issues|Critical errors|Warnings):/.test(line)) {
+                    html += `<div style="font-size:12px;color:var(--muted);margin:2px 0 2px 4px">${line}</div>`;
+                } else {
+                    html += `<div style="font-size:12px;margin:2px 0;color:var(--text)">${line}</div>`;
+                }
+            }
+            html += `<div style="margin-top:16px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px">⚠ AI may make arithmetic errors — verify all totals manually.</div>`;
+            container.innerHTML = html;
+        }
+
+        function _showAINotConfigured() {
+            const ind = document.getElementById('save-indicator');
+            ind.textContent = '⚠ AI not configured — check Settings ⚙️';
+            ind.classList.add('visible');
+            setTimeout(() => ind.classList.remove('visible'), 4000);
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
         async function analyzeInvoiceAI() {
-            if (!CONFIG.AI_API_KEY) {
-                alert("Please configure the AI API Key in Settings (⚙️).");
-                return;
-            }
-            if (!CONFIG.AI_MODEL) {
-                alert("Please select an AI model in Settings (⚙️).");
-                return;
-            }
+            if (!CONFIG.AI_API_KEY || !CONFIG.AI_MODEL) { _showAINotConfigured(); return; }
 
-            const apiKey = CONFIG.AI_API_KEY.trim();
-
-            const state = getInvoiceState();
             const resultsDiv = document.getElementById('ai-results');
             resultsDiv.style.display = 'block';
             resultsDiv.innerHTML = '<span class="ai-loading">AI is analyzing invoice data for patterns and discrepancies...</span>';
 
-            const systemPrompt = CONFIG.AI_INSTRUCTIONS || "Analyze this legal investigation invoice data and provide a concise summary. Check for potential billing errors, summarize total hours per case, and suggest if any mileage entries look unusual based on the descriptions.";
-            const prompt = `${systemPrompt}\n\nInvoice Data: ${JSON.stringify(state, null, 2)}`;
+            const systemPrompt = CONFIG.AI_INSTRUCTIONS || 'Analyze this legal investigation invoice data and provide a concise summary. Check for potential billing errors, summarize total hours per case, and flag any mileage entries that look unusual.';
 
             try {
-                const model = CONFIG.AI_MODEL || 'gemini-1.5-flash';
-                let url, headers = { 'Content-Type': 'application/json' }, body;
-                const temperature = CONFIG.AI_TEMPERATURE || 0.7;
-                const max_tokens = CONFIG.AI_MAX_TOKENS || 2048;
-                const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, ''); // Clean trailing slash
-
-                if (model.startsWith('gemini')) {
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                    body = JSON.stringify({ 
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature, maxOutputTokens: max_tokens },
-                        safetySettings: [ // Default safety settings for Gemini
-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                        ]
-                    });
-                } else if (model.startsWith('claude')) {
-                    url = 'https://api.anthropic.com/v1/messages';
-                    headers['x-api-key'] = apiKey;
-                    headers['anthropic-version'] = '2023-06-01';
-                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
-                    body = JSON.stringify({
-                        model,
-                        max_tokens,
-                        temperature,
-                        system: systemPrompt,
-                        messages: [{ role: 'user', content: `Here is the invoice data to analyze:\n\n${JSON.stringify(state, null, 2)}` }]
-                    });
-                } else {
-                    // OpenAI Compatible API (GPT, Grok, DeepSeek, Perplexity, Custom)
-                    if (model === 'custom') {
-                        if (!baseUrl) {
-                            resultsDiv.innerHTML = "<strong>Error:</strong> Custom endpoint selected but API Base URL is empty.";
-                            return;
-                        }
-                        url = baseUrl + '/chat/completions';
-                    } else if (model.startsWith('gpt')) {
-                        url = 'https://api.openai.com/v1/chat/completions';
-                    } else if (model.startsWith('deepseek')) {
-                        url = 'https://api.deepseek.com/chat/completions';
-                    } else if (model.includes('sonar')) { // Perplexity
-                        url = 'https://api.perplexity.ai/chat/completions';
-                    } else if (model.startsWith('grok')) {
-                        url = 'https://api.x.ai/v1/chat/completions';
-                    } else {
-                        resultsDiv.innerHTML = `<strong>Error:</strong> Unsupported model selected: ${model}`;
-                        return;
-                    }
-
-                    headers['Authorization'] = `Bearer ${apiKey}`;
-                    body = JSON.stringify({ 
-                        model: model === 'custom' ? 'default' : model, 
-                        messages: [{ role: 'user', content: prompt }],
-                        temperature,
-                        max_tokens
-                    });
-                }
-
-                const response = await fetch(url, { method: 'POST', headers, body });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    const errorMessage = errorData.error?.message || response.statusText;
-                    throw new Error(`${errorMessage}`);
-                }
-
-                const result = await response.json();
-                
-                let aiText = '';
-                if (model.startsWith('gemini')) aiText = result.candidates[0].content.parts[0].text;
-                else if (model.startsWith('claude')) aiText = result.content[0].text;
-                else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content; // Standard OpenAI format
-
+                const model  = CONFIG.AI_MODEL;
+                const aiText = await callAI(systemPrompt, `Invoice Data:\n\n${JSON.stringify(getInvoiceState(), null, 2)}`);
                 resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">⚠ Note: AI may make arithmetic errors. Please verify all calculations manually.</em>`;
             } catch (error) {
-                console.error("AI Error:", error);
+                console.error('AI Error:', error);
                 resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
             }
 
@@ -1268,35 +1313,16 @@
         }
 
         async function validateInvoice() {
-            const btn = document.getElementById('btn-validate');
-            if (btn && btn.disabled) {
-                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
-                return;
-            }
-            if (!CONFIG.AI_API_KEY) {
-                alert("Please configure the AI API Key in Settings (⚙️).");
-                return;
-            }
-            if (!CONFIG.AI_MODEL) {
-                alert("Please select an AI model in Settings (⚙️).");
-                return;
-            }
+            if (!CONFIG.AI_API_KEY || !CONFIG.AI_MODEL) { _showAINotConfigured(); return; }
 
-            const apiKey = CONFIG.AI_API_KEY.trim();
-
-            const state = getInvoiceState();
-            const modal = document.getElementById('validation-modal');
+            const modal     = document.getElementById('validation-modal');
             const contentEl = document.getElementById('validation-content');
             modal.style.display = 'flex';
-            contentEl.innerHTML = '<span class="ai-loading">Validating invoice... checking for errors and discrepancies...</span>';
+            contentEl.innerHTML = '<span class="ai-loading">Validating invoice… checking for errors and discrepancies…</span>';
 
             const validationPrompt = `You are an invoice validation assistant for a legal investigation firm. Review the provided invoice data and produce a structured validation report.
 
-BILLING RATES (use these for totals computation):
-- Pre-2025-08-01 service hours: $55.00/hour
-- Post-2025-08-01 service hours: $59.00/hour
-- 2025 mileage: $0.70/mile
-- 2026 mileage: $0.725/mile
+${buildRatesSection()}
 
 VALIDATION CHECKS:
 1. Rate Errors: For each service hour entry, check if its date falls before or after Aug 1, 2025 and verify the rate matches the expected rate for that date period. If mismatches found, list each with date, case #, expected vs actual rate. If no entries exist for a period, just say "No rate errors detected." If no service hours at all, say "No service hours to validate."
@@ -1344,73 +1370,14 @@ If no issues: "No validation issues detected."
 
 Use complete sentences where helpful. Be specific (date, case #, description snippets) but concise. Group related items under section headers.
 `;
-            const prompt = `${validationPrompt}\n\nInvoice Data: ${JSON.stringify(state, null, 2)}`;
-
             try {
-                const model = CONFIG.AI_MODEL;
-                let url, headers = { 'Content-Type': 'application/json' }, body;
-                const temperature = CONFIG.AI_TEMPERATURE || 0.3;
-                const max_tokens = CONFIG.AI_MAX_TOKENS || 2048;
-                const baseUrl = CONFIG.AI_BASE_URL.replace(/\/$/, '');
-
-                if (model.startsWith('gemini')) {
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                    body = JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature, maxOutputTokens: max_tokens * 2 },
-                        safetySettings: [
-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                        ]
-                    });
-                } else if (model.startsWith('claude')) {
-                    url = 'https://api.anthropic.com/v1/messages';
-                    headers['x-api-key'] = apiKey;
-                    headers['anthropic-version'] = '2023-06-01';
-                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
-                    body = JSON.stringify({
-                        model,
-                        max_tokens: max_tokens * 2,
-                        temperature,
-                        system: validationPrompt,
-                        messages: [{ role: 'user', content: `Validate this invoice data:\n\n${JSON.stringify(state, null, 2)}` }]
-                    });
-                } else {
-                    const openAiBaseUrl = baseUrl || 'https://api.openai.com/v1';
-                    url = openAiBaseUrl + '/chat/completions';
-                    headers['Authorization'] = `Bearer ${apiKey}`;
-                    body = JSON.stringify({
-                        model: model === 'custom' ? 'gpt-3.5-turbo' : model,
-                        messages: [
-                            { role: 'system', content: validationPrompt },
-                            { role: 'user', content: `Validate this invoice data:\n\n${JSON.stringify(state, null, 2)}` }
-                        ],
-                        temperature,
-                        max_tokens: max_tokens * 2
-                    });
-                }
-
-                const response = await fetch(url, { method: 'POST', headers, body });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    const errorMessage = errorData.error?.message || response.statusText;
-                    throw new Error(`${errorMessage}`);
-                }
-
-                const result = await response.json();
-
-                let aiText = '';
-                if (model.startsWith('gemini')) aiText = result.candidates[0].content.parts[0].text;
-                else if (model.startsWith('claude')) aiText = result.content[0].text;
-                else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content;
-
-                contentEl.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">⚠ Note: AI may make arithmetic errors. Please verify all calculations, especially totals, manually.</em>`;
+                const model   = CONFIG.AI_MODEL;
+                const aiText  = await callAI(validationPrompt, `Validate this invoice:\n\n${JSON.stringify(getInvoiceState(), null, 2)}`, 2);
+                contentEl.innerHTML = `<div style="font-weight:700;font-size:12px;color:var(--muted);margin-bottom:8px">Model: ${model}</div>`;
+                renderValidationReport(aiText, contentEl);
             } catch (error) {
-                console.error("Validation Error:", error);
-                contentEl.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                console.error('Validation Error:', error);
+                contentEl.innerHTML = `<strong style="color:#ff6b6b">Error:</strong> ${error.message}`;
             }
         }
 
