@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <script type="application/json" id="cowork-artifact-meta">
 {
     "name": "Invoice Preview",
@@ -174,26 +174,27 @@
             <h3 style="margin: 0; font-size: 16px; color: var(--border);">Data Import</h3>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="active-model-display"></span>
-                <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 16px; line-height: 1;">⚙️</button>
+                <button onclick="openSettings()" title="Settings" style="padding: 6px 10px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 16px; line-height: 1;">âš™ï¸</button>
                 <span id="git-version" title="Deployed version" style="font-size: 10px; color: var(--muted); font-family: monospace;">ver: &lt;fetching...&gt;</span>
             </div>
         </div>
         <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste a spreadsheet or drop a PAE.</div>
         <textarea id="paste-area" placeholder="Paste spreadsheet data or drop a PAE..."></textarea>
-        <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
-            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Scan PDF</button>
-            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
-            <button onclick="window.print()" title="Print invoice using browser print" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
-            <button onclick="downloadPdf()" title="Download invoice as PDF file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 PDF</button>
-            <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📤 Export</button>
-            <label for="json-input" title="Import invoice from JSON" tabindex="0" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box; display: inline-block; text-align: center; margin: 0;">📥 Import</label>
-            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
-            <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Anonymize</button>
-            <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">✅ Validate</button>
+        <div style="display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
+            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ“„ Scan PDF</button>
+            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ—‘ï¸ Clear Box</button>
+            <button onclick="importFromPasteArea()" title="Import data from the paste box" style="padding: 6px 8px; cursor: pointer; background: var(--accent); border: 1px solid var(--border); color: #000; border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ“‹ Import</button>
+            <button onclick="window.print()" title="Print invoice using browser print" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ–¨ï¸ Print</button>
+            <button onclick="downloadPdf()" title="Download invoice as PDF file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ“¥ PDF</button>
+            <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ“¤ Export</button>
+            <label for="json-input" title="Import invoice from JSON" tabindex="0" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box; display: inline-block; text-align: center; margin: 0;">ðŸ“¥ Import</label>
+            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ—‘ï¸ Clear All</button>
+            <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">ðŸ·ï¸ Anonymize</button>
+            <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">âœ… Validate</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
             <input type="file" id="json-input" accept=".json" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-            <span id="save-indicator">✔ Saved to Browser</span>
+            <span id="save-indicator">âœ” Saved to Browser</span>
         </div>
     </div>
 
@@ -202,7 +203,7 @@
         <div class="modal-content" style="max-width:800px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                 <div style="font-family:var(--ui);font-weight:800;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text)">Invoice Validation Report</div>
-                <button onclick="document.getElementById('validation-modal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+                <button onclick="document.getElementById('validation-modal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">âœ•</button>
             </div>
             <div id="validation-content" style="font-size:13px;line-height:1.6;color:var(--text);max-height:70vh;overflow-y:auto;white-space:pre-wrap"></div>
         </div>
@@ -215,7 +216,7 @@
                 <span>App Settings</span>
                 <button class="btn-close" onclick="closeSettings()">&times;</button>
             </div>
-            <div id="settings-save-message" style="display: none; color: var(--accent); font-size: 12px; margin-bottom: 8px; font-weight: bold; text-align: center;">✔ Settings saved</div>
+            <div id="settings-save-message" style="display: none; color: var(--accent); font-size: 12px; margin-bottom: 8px; font-weight: bold; text-align: center;">âœ” Settings saved</div>
             
             <div class="modal-tabs">
                 <div class="modal-tab" data-tab="webhook" onclick="switchTab('webhook')">Webhook Sync</div>
@@ -227,8 +228,8 @@
                     <label>Google Sheets Webhook URL</label>
                     <div class="input-group">
                         <input type="password" id="setting-webhook" placeholder="Not yet implemented" readonly>
-                        <button class="btn-icon" onclick="toggleField('setting-webhook', 'visibility')" title="Toggle Visibility">👁️</button>
-                        <button class="btn-icon" id="lock-webhook" onclick="toggleField('setting-webhook', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" onclick="toggleField('setting-webhook', 'visibility')" title="Toggle Visibility">ðŸ‘ï¸</button>
+                        <button class="btn-icon" id="lock-webhook" onclick="toggleField('setting-webhook', 'lock')" title="Unlock Field">ðŸ”’</button>
                     </div>
                 </div>
                 <div class="instructions" style="font-size: 10px;">Webhook integration coming soon. This will sync invoice data to Google Sheets.</div>
@@ -272,7 +273,7 @@
                                 <option value="custom">Custom Endpoint</option>
                             </optgroup>
                         </select>
-                        <button class="btn-icon" id="lock-ai-model" onclick="toggleField('setting-ai-model', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" id="lock-ai-model" onclick="toggleField('setting-ai-model', 'lock')" title="Unlock Field">ðŸ”’</button>
                     </div>
                 </div>
 
@@ -283,8 +284,8 @@
                     </div>
                     <div class="input-group">
                         <input type="text" id="setting-ai-key" placeholder="Enter your API Key" readonly style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0.5px; width: 100%; min-width: 500px; user-select: text;">
-                        <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">👁️</button>
-                        <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" onclick="toggleField('setting-ai-key', 'visibility')" title="Toggle Visibility">ðŸ‘ï¸</button>
+                        <button class="btn-icon" id="lock-ai-key" onclick="toggleField('setting-ai-key', 'lock')" title="Unlock Field">ðŸ”’</button>
                         <button class="btn-test" onclick="testAI()" style="padding: 6px 12px; font-size: 11px; font-weight: bold;">Test</button>
                     </div>
                 </div>
@@ -296,26 +297,26 @@
                     </div>
                     <div class="input-group">
                         <input type="text" id="setting-ai-base-url" placeholder="https://api.openai.com/v1" readonly>
-                        <button class="btn-icon" id="lock-ai-base-url" onclick="toggleField('setting-ai-base-url', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" id="lock-ai-base-url" onclick="toggleField('setting-ai-base-url', 'lock')" title="Unlock Field">ðŸ”’</button>
                     </div>
                 </div>
 
                 <div class="settings-field">
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span> <span id="temp-help-icon" title="Recommended 0.5-0.7 for invoice analysis" style="cursor: help; color: var(--accent);">ⓘ</span></label>
+                        <label style="margin-bottom: 0;">Temperature: <span id="val-ai-temp">0.7</span> <span id="temp-help-icon" title="Recommended 0.5-0.7 for invoice analysis" style="cursor: help; color: var(--accent);">â“˜</span></label>
                         <span class="instructions" style="font-size: 10px; margin: 0;">unlock to change</span>
                     </div>
                     <div class="input-group">
                         <input type="range" id="setting-ai-temp" min="0" max="2" step="0.1" value="0.7" disabled oninput="document.getElementById('val-ai-temp').textContent=this.value">
-                        <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" id="lock-ai-temp" onclick="toggleField('setting-ai-temp', 'lock')" title="Unlock Field">ðŸ”’</button>
                     </div>
                     <div id="temp-help-popup" style="display: none; position: absolute; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 300px; z-index: 100;">
                         <strong>Temperature</strong><br>
                         Controls AI response randomness:<br>
-                        • <strong>0.0–0.3:</strong> Focused, consistent (facts)<br>
-                        • <strong>0.5–0.7 (recommended):</strong> Balanced (invoice review)<br>
-                        • <strong>0.8–1.5:</strong> Creative, varied<br>
-                        • <strong>1.5+:</strong> Very random, unreliable
+                        â€¢ <strong>0.0â€“0.3:</strong> Focused, consistent (facts)<br>
+                        â€¢ <strong>0.5â€“0.7 (recommended):</strong> Balanced (invoice review)<br>
+                        â€¢ <strong>0.8â€“1.5:</strong> Creative, varied<br>
+                        â€¢ <strong>1.5+:</strong> Very random, unreliable
                     </div>
                 </div>
 
@@ -326,7 +327,7 @@
                     </div>
                     <div class="input-group">
                         <input type="number" id="setting-ai-tokens" placeholder="2048" disabled>
-                        <button class="btn-icon" id="lock-ai-tokens" onclick="toggleField('setting-ai-tokens', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" id="lock-ai-tokens" onclick="toggleField('setting-ai-tokens', 'lock')" title="Unlock Field">ðŸ”’</button>
                     </div>
                 </div>
 
@@ -337,7 +338,7 @@
                     </div>
                     <div class="input-group">
                         <textarea id="setting-ai-instructions" rows="3" readonly style="flex: 1; padding: 10px; border-radius: 4px; font-size: 13px; resize: vertical;"></textarea>
-                        <button class="btn-icon" id="lock-ai-instructions" onclick="toggleField('setting-ai-instructions', 'lock')" title="Unlock Field">🔒</button>
+                        <button class="btn-icon" id="lock-ai-instructions" onclick="toggleField('setting-ai-instructions', 'lock')" title="Unlock Field">ðŸ”’</button>
                     </div>
                 </div>
 
@@ -359,8 +360,8 @@
                 <button class="btn-close" onclick="closeAiMenu()">&times;</button>
             </div>
             <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
-                <button onclick="closeAiMenu(); analyzeInvoiceAI();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: var(--bg); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">📊 Analyze Invoice Data</button>
-                <button onclick="closeAiMenu(); convertNamesToCodes();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">🏷️ Convert Names to Codes</button>
+                <button onclick="closeAiMenu(); analyzeInvoiceAI();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: var(--bg); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">ðŸ“Š Analyze Invoice Data</button>
+                <button onclick="closeAiMenu(); convertNamesToCodes();" style="padding: 14px; border-radius: 8px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: 'Barlow', sans-serif; font-weight: bold; font-size: 15px; cursor: pointer;">ðŸ·ï¸ Convert Names to Codes</button>
             </div>
         </div>
     </div>
@@ -451,8 +452,8 @@
                 <tr><td contenteditable="true" style="white-space: nowrap;">Color Copies: 0</td><td contenteditable="true"></td><td contenteditable="true">Hours @ $59</td><td style="text-align: center;" contenteditable="true">0.0 hrs</td><td style="text-align: center;" contenteditable="true">$59.00</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
                 <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Mileage @ 2025 Rate</td><td style="text-align: center;" contenteditable="true">0.0 mi</td><td style="text-align: center;" contenteditable="true">$0.70</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
                 <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Mileage @ 2026 Rate</td><td style="text-align: center;" contenteditable="true">0 mi</td><td style="text-align: center;" contenteditable="true">$0.725</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
-                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Expenses</td><td style="text-align: center;" contenteditable="true">—</td><td style="text-align: center;" contenteditable="true">—</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
-                <tr class="grand-total"><td></td><td></td><td style="text-align: right;">TOTAL:</td><td style="text-align: center;">—</td><td style="text-align: center;">—</td><td class="amount-col" id="field-grand-total">$0.00</td></tr>
+                <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true">Expenses</td><td style="text-align: center;" contenteditable="true">â€”</td><td style="text-align: center;" contenteditable="true">â€”</td><td class="amount-col" contenteditable="true">$0.00</td></tr>
+                <tr class="grand-total"><td></td><td></td><td style="text-align: right;">TOTAL:</td><td style="text-align: center;">â€”</td><td style="text-align: center;">â€”</td><td class="amount-col" id="field-grand-total">$0.00</td></tr>
             </tbody>
         </table>
     </div>
@@ -750,12 +751,12 @@
             if (authHours > 0) {
                 if (totalHoursBilled > authHours) {
                     const overage = (totalHoursBilled - authHours).toFixed(1);
-                    totalRows[5].cells[0].textContent = `⚠️ +${overage} hrs over auth`;
+                    totalRows[5].cells[0].textContent = `âš ï¸ +${overage} hrs over auth`;
                     totalRows[5].cells[0].style.cssText = 'background: #522; color: #ffcccc; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #f66; border-bottom: 2px solid #f66;';
                     totalRows[5].cells[1].style.cssText = 'background: #522; border-top: 2px solid #f66; border-bottom: 2px solid #f66; border-left: none; border-right: none; color: #ffcccc;';
                 } else {
                     const remaining = (authHours - totalHoursBilled).toFixed(1);
-                    totalRows[5].cells[0].textContent = `✓ ${remaining} hrs remaining`;
+                    totalRows[5].cells[0].textContent = `âœ“ ${remaining} hrs remaining`;
                     totalRows[5].cells[0].style.cssText = 'background: #252525; color: #6f6; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #666; border-bottom: 2px solid #666;';
                     totalRows[5].cells[1].style.cssText = 'background: #252525; border-top: 2px solid #666; border-bottom: 2px solid #666; border-left: none; border-right: none; color: #6f6;';
                 }
@@ -931,11 +932,11 @@
 
         async function analyzeInvoiceAI() {
             if (!CONFIG.AI_API_KEY) {
-                alert("Please configure the AI API Key in Settings (⚙️).");
+                alert("Please configure the AI API Key in Settings (âš™ï¸).");
                 return;
             }
             if (!CONFIG.AI_MODEL) {
-                alert("Please select an AI model in Settings (⚙️).");
+                alert("Please select an AI model in Settings (âš™ï¸).");
                 return;
             }
 
@@ -1025,7 +1026,7 @@
                 else if (model.startsWith('claude')) aiText = result.content[0].text;
                 else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content; // Standard OpenAI format
 
-                resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">⚠ Note: AI may make arithmetic errors. Please verify all calculations manually.</em>`;
+                resultsDiv.innerHTML = `<strong>AI Analysis (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">âš  Note: AI may make arithmetic errors. Please verify all calculations manually.</em>`;
             } catch (error) {
                 console.error("AI Error:", error);
                 resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
@@ -1037,15 +1038,15 @@
         async function validateInvoice() {
             const btn = document.getElementById('btn-validate');
             if (btn && btn.disabled) {
-                alert("AI is disabled. Click the Settings ⚙️ button to configure your AI API key and select a model.");
+                alert("AI is disabled. Click the Settings âš™ï¸ button to configure your AI API key and select a model.");
                 return;
             }
             if (!CONFIG.AI_API_KEY) {
-                alert("Please configure the AI API Key in Settings (⚙️).");
+                alert("Please configure the AI API Key in Settings (âš™ï¸).");
                 return;
             }
             if (!CONFIG.AI_MODEL) {
-                alert("Please select an AI model in Settings (⚙️).");
+                alert("Please select an AI model in Settings (âš™ï¸).");
                 return;
             }
 
@@ -1070,18 +1071,18 @@ VALIDATION CHECKS:
 
 2. Duplicate Entries: Check for rows with identical date, category, description, and hours. If duplicates found, list them. If none, say "No duplicate entries detected."
 
-3. PAE Drop Information: If PAE header field (field-pae-header) is non-empty (i.e., a PAE was dropped/imported), verify all required PAE fields are populated: PAE #, PAE Expiration, Estimated Trav Costs, Auth Serv Amount, Auth Hours, Total Auth. If any are missing or still placeholder, output: "PAE information incomplete — all PAE fields must be filled." If all present, say "PAE information complete."
+3. PAE Drop Information: If PAE header field (field-pae-header) is non-empty (i.e., a PAE was dropped/imported), verify all required PAE fields are populated: PAE #, PAE Expiration, Estimated Trav Costs, Auth Serv Amount, Auth Hours, Total Auth. If any are missing or still placeholder, output: "PAE information incomplete â€” all PAE fields must be filled." If all present, say "PAE information complete."
 
 4. Missing Fields: Check all required header fields. Output a bulleted list under "MISSING FIELDS" header. Include only fields that are empty or contain placeholder text:
-   • Invoice Number is missing
-   • Client is missing
-   • Attorney is missing
-   • Case # is missing
-   • Investigator is missing
-   • Invoice Date is missing
+   â€¢ Invoice Number is missing
+   â€¢ Client is missing
+   â€¢ Attorney is missing
+   â€¢ Case # is missing
+   â€¢ Investigator is missing
+   â€¢ Invoice Date is missing
    If all required fields present, say "All required fields present."
 
-5. Date Logic: Invoice Date should be on or after the latest service date. If PAE effective/expiration dates are present, service dates must fall within that window. Also flag any service entry that falls outside the stated billing date range (from field-date-range). If all OK, say "Date logic OK." If violations, list each with date, case, and reason (e.g., "05/04/2026 outside billing range 04/22–05/03").
+5. Date Logic: Invoice Date should be on or after the latest service date. If PAE effective/expiration dates are present, service dates must fall within that window. Also flag any service entry that falls outside the stated billing date range (from field-date-range). If all OK, say "Date logic OK." If violations, list each with date, case, and reason (e.g., "05/04/2026 outside billing range 04/22â€“05/03").
 
 6. Authorization Exceeded: If 'Auth Hours' is set, compare total billed hours to authorized. If exceeded, flag and state "Hours exceeded: billed X.X vs authorized Y.Y." If within limit or not set, say "Authorization not exceeded."
 
@@ -1089,18 +1090,18 @@ VALIDATION CHECKS:
 
 8. Copy Counts: Verify B&W and Color copy quantities appear as line items in expenses with correct computed amounts ($0.10 per B&W, $0.50 per color). If missing or amounts wrong, flag with details. If correct, say "Copy count line items present and correct."
 
-9. Empty Descriptions: Any service hour entry with blank or missing description — flag by date, case, and description snippet. If all have descriptions, say "No empty descriptions."
+9. Empty Descriptions: Any service hour entry with blank or missing description â€” flag by date, case, and description snippet. If all have descriptions, say "No empty descriptions."
 
-10. Travel Sequence: For each date with Investigator Service AND at least one mileage entry, verify the pattern: Outbound (miles + travel hours) → Service event → Return (miles + travel hours). Multi-stop: Leg1 → Service1 → Leg2 → Service2 → ... → Return. Flag issues: missing legs, missing service between travel, orphaned mileage/hours, incomplete sequences, or travel continuing after return without clarification. If all dates with mileage are complete, say "Travel sequences complete for all dates."
+10. Travel Sequence: For each date with Investigator Service AND at least one mileage entry, verify the pattern: Outbound (miles + travel hours) â†’ Service event â†’ Return (miles + travel hours). Multi-stop: Leg1 â†’ Service1 â†’ Leg2 â†’ Service2 â†’ ... â†’ Return. Flag issues: missing legs, missing service between travel, orphaned mileage/hours, incomplete sequences, or travel continuing after return without clarification. If all dates with mileage are complete, say "Travel sequences complete for all dates."
 
 11. OOP per Leg: For each mileage leg on a given date, check for a matching Out-of-Pocket expense (tolls/parking). If leg lacks OOP and description doesn't indicate no-travel context (e.g., "Admin Time", "Local File Review"), flag by date and route. If all legs covered or no mileage legs, say "OOP expenses tracked for all travel legs."
 
-12. Totals Integrity: Using the hourly and mileage rates provided above, compute the grand total from all line items (sum of: hours in each period × appropriate rate, miles in each year × appropriate rate, expenses subtotal). Compare your computed total to the displayed TOTAL field. If they match, say "Totals integrity verified." If different, state: "Totals mismatch: computed $X.XX vs displayed $Y.YY."
+12. Totals Integrity: Using the hourly and mileage rates provided above, compute the grand total from all line items (sum of: hours in each period Ã— appropriate rate, miles in each year Ã— appropriate rate, expenses subtotal). Compare your computed total to the displayed TOTAL field. If they match, say "Totals integrity verified." If different, state: "Totals mismatch: computed $X.XX vs displayed $Y.YY."
 
 OUTPUT FORMAT (exactly):
 === VALIDATION REPORT ===
 [Section header in ALL CAPS like "RATE ERRORS" or "MISSING FIELDS"]
-• [clear, specific bullet: e.g., "05/04/2026 Case 26CR19524 — rate $55/hr used but date is after Aug 1, 2025; expected $59/hr" — include date, case #, and details]
+â€¢ [clear, specific bullet: e.g., "05/04/2026 Case 26CR19524 â€” rate $55/hr used but date is after Aug 1, 2025; expected $59/hr" â€” include date, case #, and details]
 [Next section...]
 === SUMMARY ===
 Total issues found: N
@@ -1174,7 +1175,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 else if (model.startsWith('claude')) aiText = result.content[0].text;
                 else if (result.choices && result.choices[0] && result.choices[0].message) aiText = result.choices[0].message.content;
 
-                contentEl.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">⚠ Note: AI may make arithmetic errors. Please verify all calculations, especially totals, manually.</em>`;
+                contentEl.innerHTML = `<strong>Invoice Validation (${model}):</strong><br>${aiText.replace(/\n/g, '<br>')}<br><br><em style="color:var(--muted);font-size:11px">âš  Note: AI may make arithmetic errors. Please verify all calculations, especially totals, manually.</em>`;
             } catch (error) {
                 console.error("Validation Error:", error);
                 contentEl.innerHTML = `<strong>Error:</strong> ${error.message}`;
@@ -1287,7 +1288,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 input.readOnly = locked;
             }
             input.style.background = locked ? '#f5f5f5' : '#fff';
-            if (lockBtn) lockBtn.textContent = locked ? '🔒' : '🔓';
+            if (lockBtn) lockBtn.textContent = locked ? 'ðŸ”’' : 'ðŸ”“';
         }
 
         function toggleField(id, action) {
@@ -1313,7 +1314,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 
                 input.style.background = newState ? '#f5f5f5' : '#fff';
                 
-                if (lockBtn) lockBtn.textContent = newState ? '🔒' : '🔓';
+                if (lockBtn) lockBtn.textContent = newState ? 'ðŸ”’' : 'ðŸ”“';
                 if (!newState) input.focus();
 
                 // Explicitly persist current field value at lock time
@@ -1440,7 +1441,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             const saveMsg = document.getElementById('settings-save-message');
             if (saveMsg) {
                 saveMsg.style.display = 'block';
-                saveMsg.textContent = '✔ Settings saved';
+                saveMsg.textContent = 'âœ” Settings saved';
                 setTimeout(() => { saveMsg.style.display = 'none'; }, 2000);
             }
         }
@@ -1463,7 +1464,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 btn.style.opacity = enabled ? '1' : '0.5';
                 btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
                 if (!enabled) {
-                    btn.title = 'Configure AI API key and model in Settings (⚙️) to enable';
+                    btn.title = 'Configure AI API key and model in Settings (âš™ï¸) to enable';
                 } else {
                     btn.title = 'AI analysis of invoice';
                 }
@@ -1493,8 +1494,8 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             if (savedData) applyInvoiceState(JSON.parse(savedData));
         }
 
-        // Name conversion via AI — extracts names from service hours and assigns labels
-        // Name conversion via AI — extracts names from service hours and assigns labels
+        // Name conversion via AI â€” extracts names from service hours and assigns labels
+        // Name conversion via AI â€” extracts names from service hours and assigns labels
         async function convertNamesToCodes() {
             // 1. Collect all service hours rows with case numbers
             const rows = [];
@@ -1636,7 +1637,7 @@ ${payload}`;
                 } else {
                     // Fallback: try to extract names line by line
                     extractedNames = text.split('\n')
-                        .map(l => l.replace(/^[\d\.\-\*•\s]+/, '').trim())
+                        .map(l => l.replace(/^[\d\.\-\*â€¢\s]+/, '').trim())
                         .filter(l => l.length > 0);
                 }
             } catch (e) {
@@ -1682,7 +1683,7 @@ ${payload}`;
             let html = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                     <div style="font-family:var(--ui);font-weight:800;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text)">Assign Name Labels</div>
-                    <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+                    <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">âœ•</button>
                 </div>
                 <div style="margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.5">
                     For each name found, assign a label and optional number. The name will be replaced with that label in all cases.<br>
@@ -1745,7 +1746,7 @@ ${payload}`;
                     select.dataset.idx = idx;
                     select.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center';
                     select.innerHTML = `
-                        <option value="skip" ${item.label === 'skip' ? 'selected' : ''}>— Skip —</option>
+                        <option value="skip" ${item.label === 'skip' ? 'selected' : ''}>â€” Skip â€”</option>
                         <option value="witness" ${item.label === 'witness' ? 'selected' : ''}>Witness</option>
                         <option value="poi" ${item.label === 'poi' ? 'selected' : ''}>POI</option>
                         <option value="client" ${item.label === 'client' ? 'selected' : ''}>Client</option>
@@ -1785,8 +1786,6 @@ ${payload}`;
             }
             
             renderRows();
-            
-            }
 
             function updateMergeButton() {
                 const mergeBtn = modal.querySelector('#mergeSelectedBtn');
@@ -1822,7 +1821,7 @@ ${payload}`;
                         <div>
                             <label style="display:block;font-size:12px;margin-bottom:4px">Label:</label>
                             <select id="merge-label" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
-                                <option value="skip">— Skip —</option>
+                                <option value="skip">â€” Skip â€”</option>
                                 <option value="witness">Witness</option>
                                 <option value="poi">POI</option>
                                 <option value="client">Client</option>
@@ -1885,7 +1884,7 @@ ${payload}`;
                     updatePreview();
                      mergeOverlay.remove();
                  };
-             }
+            });
 
             function updatePreview() {
                 const previewEl = modal.querySelector('#preview-list');
@@ -1908,11 +1907,11 @@ ${payload}`;
                 let html = '';
                 effectiveAssignments.forEach(({ name, label, effectiveNum }) => {
                     if (label === 'skip') {
-                        html += `<div>${name} → <span style="color:var(--muted)">(skipped)</span></div>`;
+                        html += `<div>${name} â†’ <span style="color:var(--muted)">(skipped)</span></div>`;
                         return;
                     }
                     const displayNum = effectiveNum !== null ? effectiveNum : 'auto';
-                    html += `<div>${name} → <strong>${label.charAt(0).toUpperCase() + label.slice(1)} ${displayNum}</strong></div>`;
+                    html += `<div>${name} â†’ <strong>${label.charAt(0).toUpperCase() + label.slice(1)} ${displayNum}</strong></div>`;
                 });
                 previewEl.innerHTML = html;
             }
@@ -1949,7 +1948,7 @@ ${payload}`;
                         if (!used[caseNum]) used[caseNum] = new Map();
                         const existing = used[caseNum].get(key);
                         if (existing && existing !== name) {
-                            alert(`⚠️ Conflict: ${label} ${finalNum} is already assigned to "${existing}" in case ${caseNum}. Cannot assign to "${name}".\n\nPlease change the number for "${name}" or use a different label.`);
+                            alert(`âš ï¸ Conflict: ${label} ${finalNum} is already assigned to "${existing}" in case ${caseNum}. Cannot assign to "${name}".\n\nPlease change the number for "${name}" or use a different label.`);
                             return; // abort apply
                         }
                         used[caseNum].set(key, name);
@@ -2029,13 +2028,13 @@ ${payload}`;
             modal.style.cssText = 'background:#fff;border-radius:8px;padding:16px;max-width:90vw;max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
             modal.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <div style="font-weight:bold;font-size:16px;color:#000">Invoice Preview — Save as PDF</div>
+                    <div style="font-weight:bold;font-size:16px;color:#000">Invoice Preview â€” Save as PDF</div>
                     <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">&times;</button>
                 </div>
                 <div id="pdf-preview" style="flex:1;overflow:auto;border:1px solid #ddd;padding:16px;background:#fff"></div>
                 <div style="display:flex;gap:8px;justify-content:flex-end">
                     <button id="btn-cancel-pdf" style="padding:8px 16px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer">Cancel</button>
-                    <button id="btn-save-pdf" style="padding:8px 16px;border-radius:4px;border:none;background:#0066cc;color:#fff;cursor:pointer">💾 Save PDF</button>
+                    <button id="btn-save-pdf" style="padding:8px 16px;border-radius:4px;border:none;background:#0066cc;color:#fff;cursor:pointer">ðŸ’¾ Save PDF</button>
                 </div>
             `;
             overlay.appendChild(modal);
@@ -2098,7 +2097,7 @@ ${payload}`;
                     await writable.close();
                     return;
                 } catch (err) {
-                    // User cancelled — don't download; other errors fall through
+                    // User cancelled â€” don't download; other errors fall through
                     if (err.name === 'AbortError') return;
                     console.warn('showSaveFilePicker failed, using fallback:', err);
                 }
@@ -2128,6 +2127,19 @@ ${payload}`;
             if (c.includes('investigator service')) return 'hours';
             if (c.includes('out of pocket')) return 'expenses';
             return 'hours';
+        }
+
+        async function importFromPasteArea() {
+            const text = document.getElementById('paste-area').value;
+            if (!text || !text.trim()) return;
+            if (document.querySelectorAll('.case-header').length > 0) {
+                const confirmed = await showConfirmModal("Invoice already contains data. Add these new entries to the existing invoice?");
+                if (!confirmed) {
+                    document.getElementById('paste-area').value = '';
+                    return;
+                }
+            }
+            handleDataImport(text);
         }
 
         function handleDataImport(rawText) {
@@ -2176,7 +2188,7 @@ ${payload}`;
                     const qty = parseFloat(cols[10]) || 0;
                     const miles = parseFloat(cols[11]) || 0;
                     const description = cols[15] ? cols[15].trim() : '';
-                    let route = `${cols[12].trim()} → ${cols[13].trim()}`;
+                    let route = `${cols[12].trim()} â†’ ${cols[13].trim()}`;
                     if (investigator) {
                         route += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Driver: ${investigator})`;
                     }
@@ -2320,7 +2332,7 @@ ${payload}`;
                 saveInvoiceData();
                 document.getElementById('paste-area').value = ''; 
                 const indicator = document.getElementById('save-indicator');
-                indicator.textContent = `✔ Imported ${importCount} items`;
+                indicator.textContent = `âœ” Imported ${importCount} items`;
                 indicator.classList.add('visible');
                 setTimeout(() => indicator.classList.remove('visible'), 3000);
             }
@@ -2418,20 +2430,12 @@ ${payload}`;
 
             const pasteArea = document.getElementById('paste-area');
             
-            // Use the specific paste event which is more reliable for large spreadsheet data
-            pasteArea.addEventListener('paste', async (e) => {
+            pasteArea.addEventListener('paste', (e) => {
+                e.preventDefault();
                 const text = (e.clipboardData || window.clipboardData).getData('Text');
-                if (text) {
-                    // If invoice already has data, ask before adding more
-                    if (document.querySelectorAll('.case-header').length > 0) {
-                        const confirmed = await showConfirmModal("Invoice already contains data. Add these new entries to the existing invoice?");
-                        if (!confirmed) {
-                            pasteArea.value = '';
-                            return;
-                        }
-                    }
-                    setTimeout(() => handleDataImport(text), 50);
-                }
+                if (!text) return;
+                pasteArea.value = text;
+                importFromPasteArea();
             });
 
             // Drag and Drop support
