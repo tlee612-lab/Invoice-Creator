@@ -221,6 +221,7 @@
             <div class="modal-tabs">
                 <div class="modal-tab" data-tab="webhook" onclick="switchTab('webhook')">Webhook Sync</div>
                 <div class="modal-tab active" data-tab="ai" onclick="switchTab('ai')">AI Assistant</div>
+                <div class="modal-tab" data-tab="rates" onclick="switchTab('rates')">Rates</div>
             </div>
 
             <div id="tab-webhook" class="tab-content">
@@ -343,6 +344,10 @@
                 </div>
 
                 <div class="instructions" style="font-size: 10px;">Configure your AI provider and parameters for invoice auditing.</div>
+            </div>
+
+            <div id="tab-rates" class="tab-content">
+                <div id="rate-schedules-container"></div>
             </div>
 
             <div class="modal-actions">
@@ -503,14 +508,35 @@
             return new Date(dateStr);
         }
 
+        // Look up rate for a given date from a schedule array [{effective:'YYYY-MM-DD', rate}]
+        // Returns rate of most recent entry whose effective date <= dateStr; falls back to last entry
+        function getRateForDate(schedule, dateStr) {
+            if (!schedule || !schedule.length) return 0;
+            const d = dateStr ? parseLocalDate(dateStr) : new Date();
+            let found = null, foundEff = new Date(0);
+            for (const entry of schedule) {
+                const eff = parseLocalDate(entry.effective);
+                if (!isNaN(eff.getTime()) && d >= eff && eff >= foundEff) {
+                    found = entry;
+                    foundEff = eff;
+                }
+            }
+            return found ? found.rate : schedule[schedule.length - 1].rate;
+        }
+
+        // Returns the highest (most recent) rate in a schedule
+        function getCurrentRate(schedule) {
+            if (!schedule || !schedule.length) return 0;
+            return schedule.reduce((max, e) => e.rate > max ? e.rate : max, 0);
+        }
+
         const CONFIG = {
-            RATE_EARLY: 55,
-            RATE_LATE: 59,
-            RATE_CUTOFF_DATE: new Date(2025, 7, 1), // August 1st, 2025
-            MILEAGE_2025: 0.70,
-            MILEAGE_2026: 0.725,
-            COPY_RATE_BW: 0.10,
-            COPY_RATE_COLOR: 0.50,
+            RATE_SCHEDULES: {
+                hourly:       [{ effective: '2025-08-01', rate: 59.00 }, { effective: '2000-01-01', rate: 55.00 }],
+                mileage:      [{ effective: '2026-01-01', rate: 0.725 }, { effective: '2025-01-01', rate: 0.70 }],
+                copies_bw:    [{ effective: '2000-01-01', rate: 0.10 }],
+                copies_color: [{ effective: '2000-01-01', rate: 0.50 }],
+            },
             GOOGLE_WEBHOOK_URL: '',
             AI_API_KEY: '',
             AI_MODEL: '',
@@ -542,9 +568,9 @@
                 
                 const tableId = tableBody.closest('table').id;
                 if (tableId === 'table-hours') {
-                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Hours @ $${CONFIG.RATE_EARLY}: 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hours @ $${CONFIG.RATE_LATE}: 0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="hours-col" contenteditable="true">0.0</td>`;
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Hours: 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="hours-col" contenteditable="true">0.0</td>`;
                 } else if (tableId === 'table-mileage') {
-                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Mileage @ $${CONFIG.MILEAGE_2025} (2025): 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mileage @ $${CONFIG.MILEAGE_2026} (2026): 0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="miles-col" contenteditable="true">0.0</td>`;
+                    subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;"><span class="blue-text">Miles: 0.0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:</td><td class="miles-col" contenteditable="true">0.0</td>`;
                 } else if (tableId === 'table-expenses') {
                     subtotalRow.innerHTML = `<td colspan="${colSpanData - 1}" style="text-align: right;">Subtotal:</td><td class="amount-col" contenteditable="true">$0.00</td>`;
                 }
@@ -554,44 +580,53 @@
         }
 
         function updateInvoiceTotals() {
-            let totalHours55 = 0, totalHours59 = 0;
-            let totalMiles2025 = 0, totalMiles2026 = 0;
             let totalExpenses = 0;
             let allServiceDates = [];
+            const hoursByRate = new Map(); // rate -> total hours across all cases
 
             // Process Service Hours
             const serviceTable = document.getElementById('table-hours');
             const serviceCaseHeaders = serviceTable.querySelectorAll('.case-header');
             serviceCaseHeaders.forEach(caseHeader => {
                 const caseNumber = caseHeader.dataset.caseId;
-                let caseHours55 = 0, caseHours59 = 0;
+                const caseHoursByRate = new Map();
                 let currentRow = caseHeader.nextElementSibling;
                 while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
                     const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
                     const hoursCell = currentRow.cells[3] ? currentRow.cells[3].textContent.replace(/[^\d.-]/g, '') : '0';
                     const hours = parseFloat(hoursCell) || 0;
-
-                     if (dateCell) {
-                         const date = parseLocalDate(dateCell);
-
-                         if (!isNaN(date.getTime())) allServiceDates.push(date);
-                         if (date < CONFIG.RATE_CUTOFF_DATE) caseHours55 += hours;
-                         else caseHours59 += hours;
-                      }
-                     currentRow = currentRow.nextElementSibling;
+                    if (dateCell && hours > 0) {
+                        const date = parseLocalDate(dateCell);
+                        if (!isNaN(date.getTime())) {
+                            allServiceDates.push(date);
+                            const rate = getRateForDate(CONFIG.RATE_SCHEDULES.hourly, dateCell);
+                            caseHoursByRate.set(rate, (caseHoursByRate.get(rate) || 0) + hours);
+                        }
+                    }
+                    currentRow = currentRow.nextElementSibling;
                 }
-                totalHours55 += caseHours55;
-                totalHours59 += caseHours59;
+                for (const [rate, hrs] of caseHoursByRate) {
+                    hoursByRate.set(rate, (hoursByRate.get(rate) || 0) + hrs);
+                }
 
                 // Find the subtotal row specifically for this case group
                 const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
                                     currentRow :
                                     serviceTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
                 if (subtotalRow && subtotalRow.cells.length >= 2) {
-                    subtotalRow.cells[0].innerHTML = `<span class="blue-text">Hours @ $${CONFIG.RATE_EARLY}: ${caseHours55.toFixed(1)}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hours @ $${CONFIG.RATE_LATE}: ${caseHours59.toFixed(1)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:`;
-                    subtotalRow.cells[1].textContent = (caseHours55 + caseHours59).toFixed(1);
+                    const sorted = [...caseHoursByRate.entries()].sort((a, b) => a[0] - b[0]);
+                    const maxRate = getCurrentRate(CONFIG.RATE_SCHEDULES.hourly);
+                    const parts = sorted.map(([rate, hrs], i) => {
+                        const text = `Hours @ $${rate}: ${hrs.toFixed(1)}`;
+                        return rate < maxRate ? `<span class="blue-text">${text}</span>` : text;
+                    });
+                    const caseTotal = [...caseHoursByRate.values()].reduce((s, h) => s + h, 0);
+                    subtotalRow.cells[0].innerHTML = parts.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:';
+                    subtotalRow.cells[1].textContent = caseTotal.toFixed(1);
                 }
             });
+            const totalHours55 = hoursByRate.get(55) || 0; // legacy compat for auth-hours check
+            const totalHours59 = hoursByRate.get(59) || 0;
 
             // Update Date Range automatically from ALL service entries (even zero-hour entries)
             if (allServiceDates.length > 0) {
@@ -605,37 +640,47 @@
             // Process Mileage
             const mileageTable = document.getElementById('table-mileage');
             const mileageCaseHeaders = mileageTable.querySelectorAll('.case-header');
+            const milesByRate = new Map(); // rate -> total miles across all cases
             mileageCaseHeaders.forEach(caseHeader => {
                 const caseNumber = caseHeader.dataset.caseId;
-                let caseMiles2025 = 0, caseMiles2026 = 0;
+                const caseMilesByRate = new Map();
                 let currentRow = caseHeader.nextElementSibling;
                 while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
                     const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
                     const milesCell = currentRow.cells[2] ? currentRow.cells[2].textContent.trim() : '0';
                     const miles = parseFloat(milesCell) || 0;
-
-                     if (dateCell && miles > 0) {
-                          const date = parseLocalDate(dateCell);
-
-                          if (!isNaN(date.getTime())) allServiceDates.push(date);
-                          const year = date.getFullYear();
-                          if (year === 2025) caseMiles2025 += miles;
-                          else if (year === 2026) caseMiles2026 += miles;
-                     }
+                    if (dateCell && miles > 0) {
+                        const date = parseLocalDate(dateCell);
+                        if (!isNaN(date.getTime())) {
+                            allServiceDates.push(date);
+                            const rate = getRateForDate(CONFIG.RATE_SCHEDULES.mileage, dateCell);
+                            caseMilesByRate.set(rate, (caseMilesByRate.get(rate) || 0) + miles);
+                        }
+                    }
                     currentRow = currentRow.nextElementSibling;
                 }
-                totalMiles2025 += caseMiles2025;
-                totalMiles2026 += caseMiles2026;
+                for (const [rate, mi] of caseMilesByRate) {
+                    milesByRate.set(rate, (milesByRate.get(rate) || 0) + mi);
+                }
 
                 // Find the subtotal row specifically for this case group
                 const subtotalRow = (currentRow && currentRow.classList.contains('subtotal')) ?
                                     currentRow :
                                     mileageTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
                 if (subtotalRow && subtotalRow.cells.length >= 2) {
-                    subtotalRow.cells[0].innerHTML = `<span class="blue-text">Mileage @ $${CONFIG.MILEAGE_2025} (2025): ${caseMiles2025.toFixed(1)}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mileage @ $${CONFIG.MILEAGE_2026} (2026): ${caseMiles2026.toFixed(1)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:`;
-                    subtotalRow.cells[1].textContent = (caseMiles2025 + caseMiles2026).toFixed(1);
+                    const sorted = [...caseMilesByRate.entries()].sort((a, b) => a[0] - b[0]);
+                    const maxRate = getCurrentRate(CONFIG.RATE_SCHEDULES.mileage);
+                    const parts = sorted.map(([rate, mi]) => {
+                        const text = `Mileage @ $${rate}: ${mi.toFixed(1)}`;
+                        return rate < maxRate ? `<span class="blue-text">${text}</span>` : text;
+                    });
+                    const caseTotal = [...caseMilesByRate.values()].reduce((s, m) => s + m, 0);
+                    subtotalRow.cells[0].innerHTML = parts.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subtotal:';
+                    subtotalRow.cells[1].textContent = caseTotal.toFixed(1);
                 }
             });
+            const totalMiles2025 = milesByRate.get(0.70) || 0; // legacy compat
+            const totalMiles2026 = milesByRate.get(0.725) || 0;
 
             // Process Expenses
             const expenseTable = document.getElementById('table-expenses');
@@ -659,7 +704,7 @@
                     }
 
                     if (category.includes('photocopy') || category.includes('copies')) {
-                        const rate = category.includes('color') ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                        const rate = category.includes('color') ? getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, dateCell) : getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw, dateCell);
                         const rowAmtCell = currentRow.cells[4];
                         if (rowAmtCell && (rowAmtCell.textContent.trim() === '$0.00' || rowAmtCell.textContent.trim() === '' || rowAmtCell.dataset.auto === 'true')) {
                             rowAmtCell.textContent = '$' + (qty * rate).toFixed(2);
@@ -698,72 +743,122 @@
                 }
             });
 
-            // Update totals table
+            // Update totals table — dynamically build rows from rate schedule data
             const totalsTable = document.querySelector('.invoice-totals-table tbody');
             if (!totalsTable) return;
-            const totalRows = totalsTable.querySelectorAll('tr');
-            if (totalRows.length < 6) return; // Safety: totals table malformed
 
-            totalRows[0].cells[0].textContent = `B&W Copies: ${totalBW} ($${(totalBW * CONFIG.COPY_RATE_BW).toFixed(2)})`;
-            totalRows[1].cells[0].textContent = `Color Copies: ${totalColor} ($${(totalColor * CONFIG.COPY_RATE_COLOR).toFixed(2)})`;
+            let grandTotal = 0;
+            const bwRate  = getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw,    new Date().toISOString().slice(0,10));
+            const colRate = getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, new Date().toISOString().slice(0,10));
+            const copyInfo0 = totalBW    > 0 ? `B&W Copies: ${totalBW} ($${(totalBW * bwRate).toFixed(2)})` : '';
+            const copyInfo1 = totalColor > 0 ? `Color Copies: ${totalColor} ($${(totalColor * colRate).toFixed(2)})` : '';
 
-            totalRows[0].cells[2].textContent = `Investigator Service - Hours @ $${CONFIG.RATE_EARLY}`;
-            totalRows[0].cells[3].textContent = totalHours55.toFixed(1) + ' hrs';
-            totalRows[0].cells[4].textContent = `$${CONFIG.RATE_EARLY.toFixed(2)}`;
-            totalRows[0].cells[5].textContent = '$' + (totalHours55 * CONFIG.RATE_EARLY).toFixed(2);
-
-            totalRows[1].cells[2].textContent = `Investigator Service - Hours @ $${CONFIG.RATE_LATE}`;
-            totalRows[1].cells[3].textContent = totalHours59.toFixed(1) + ' hrs';
-            totalRows[1].cells[4].textContent = `$${CONFIG.RATE_LATE.toFixed(2)}`;
-            totalRows[1].cells[5].textContent = '$' + (totalHours59 * CONFIG.RATE_LATE).toFixed(2);
-
-            totalRows[2].cells[3].textContent = totalMiles2025.toFixed(1) + ' mi';
-            const miles2025Amt = Math.round(totalMiles2025 * 70) / 100;
-            totalRows[2].cells[5].textContent = '$' + miles2025Amt.toFixed(2);
-
-            totalRows[3].cells[3].textContent = totalMiles2026.toFixed(1) + ' mi';
-            const miles2026Amt = Math.round(totalMiles2026 * 72.5) / 100;
-            totalRows[3].cells[5].textContent = '$' + miles2026Amt.toFixed(2);
-
-            totalRows[4].cells[2].textContent = 'Out of Pocket Expenses';
-            totalRows[4].cells[5].textContent = '$' + totalExpenses.toFixed(2);
-
-            const grandTotal = (totalHours55 * CONFIG.RATE_EARLY) + (totalHours59 * CONFIG.RATE_LATE) +
-                               (totalMiles2025 * CONFIG.MILEAGE_2025) + (totalMiles2026 * CONFIG.MILEAGE_2026) + totalExpenses;
-            totalRows[5].cells[0].textContent = '';
-            totalRows[5].cells[1].textContent = '';
-            totalRows[5].cells[2].textContent = '';
-            totalRows[5].cells[3].textContent = '';
-            totalRows[5].cells[4].textContent = 'TOTAL:';
-            totalRows[5].cells[4].style.textAlign = 'right';
-            totalRows[5].cells[5].textContent = '$' + grandTotal.toFixed(2);
-            
-            // Apply continuous bottom border to all cells in grand total row
-            for (let i = 0; i < 6; i++) {
-                totalRows[5].cells[i].style.borderBottom = '2px solid #666';
+            const rows = [];
+            // Hours rows — one per rate tier, sorted low→high
+            const sortedHourRates = [...hoursByRate.entries()].sort((a, b) => a[0] - b[0]);
+            sortedHourRates.forEach(([rate, hrs], i) => {
+                const amt = hrs * rate;
+                grandTotal += amt;
+                const copyCol = i === 0 ? copyInfo0 : (i === 1 ? copyInfo1 : '');
+                rows.push(`<tr>
+                    <td contenteditable="true" style="white-space:nowrap">${copyCol}</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true">Investigator Service - Hours @ $${rate}</td>
+                    <td style="text-align:center" contenteditable="true">${hrs.toFixed(1)} hrs</td>
+                    <td style="text-align:center" contenteditable="true">$${rate.toFixed(2)}</td>
+                    <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
+                </tr>`);
+            });
+            // If no hours rows at all, still show copy info
+            if (sortedHourRates.length === 0) {
+                rows.push(`<tr>
+                    <td contenteditable="true" style="white-space:nowrap">${copyInfo0}</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true">Investigator Service - Hours</td>
+                    <td style="text-align:center" contenteditable="true">0.0 hrs</td>
+                    <td style="text-align:center" contenteditable="true">—</td>
+                    <td class="amount-col" contenteditable="true">$0.00</td>
+                </tr>`);
+                rows.push(`<tr>
+                    <td contenteditable="true" style="white-space:nowrap">${copyInfo1}</td>
+                    <td contenteditable="true"></td><td contenteditable="true"></td>
+                    <td contenteditable="true"></td><td contenteditable="true"></td>
+                    <td class="amount-col" contenteditable="true"></td>
+                </tr>`);
+            } else if (sortedHourRates.length === 1 && copyInfo1) {
+                rows.push(`<tr>
+                    <td contenteditable="true" style="white-space:nowrap">${copyInfo1}</td>
+                    <td contenteditable="true"></td><td contenteditable="true"></td>
+                    <td contenteditable="true"></td><td contenteditable="true"></td>
+                    <td class="amount-col" contenteditable="true"></td>
+                </tr>`);
             }
+
+            // Mileage rows — one per rate tier, sorted low→high
+            const sortedMileRates = [...milesByRate.entries()].sort((a, b) => a[0] - b[0]);
+            sortedMileRates.forEach(([rate, mi]) => {
+                const amt = mi * rate;
+                grandTotal += amt;
+                rows.push(`<tr>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true">Mileage @ $${rate}/mi</td>
+                    <td style="text-align:center" contenteditable="true">${mi.toFixed(1)} mi</td>
+                    <td style="text-align:center" contenteditable="true">$${rate}</td>
+                    <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
+                </tr>`);
+            });
+            if (sortedMileRates.length === 0) {
+                rows.push(`<tr>
+                    <td contenteditable="true"></td><td contenteditable="true"></td>
+                    <td contenteditable="true">Mileage</td>
+                    <td style="text-align:center" contenteditable="true">0.0 mi</td>
+                    <td style="text-align:center" contenteditable="true">—</td>
+                    <td class="amount-col" contenteditable="true">$0.00</td>
+                </tr>`);
+            }
+
+            // Expenses row
+            grandTotal += totalExpenses;
+            rows.push(`<tr>
+                <td contenteditable="true"></td><td contenteditable="true"></td>
+                <td contenteditable="true">Out of Pocket Expenses</td>
+                <td style="text-align:center" contenteditable="true">—</td>
+                <td style="text-align:center" contenteditable="true">—</td>
+                <td class="amount-col" contenteditable="true">$${totalExpenses.toFixed(2)}</td>
+            </tr>`);
+
+            // Grand total row
+            rows.push(`<tr class="grand-total">
+                <td></td><td></td><td></td><td></td>
+                <td style="text-align:right;border-bottom:2px solid #666">TOTAL:</td>
+                <td class="amount-col" id="field-grand-total" style="border-bottom:2px solid #666">$${grandTotal.toFixed(2)}</td>
+            </tr>`);
+
+            totalsTable.innerHTML = rows.join('');
 
             // Overage/remaining status in left cells of grand total row (always visible when auth hours set)
             const authHoursEl = document.getElementById('field-auth-hours');
             const authHours = parseFloat(authHoursEl ? authHoursEl.textContent : '') || 0;
-            const totalHoursBilled = totalHours55 + totalHours59;
-            
-            if (authHours > 0) {
+            const totalHoursBilled = [...hoursByRate.values()].reduce((s, h) => s + h, 0);
+            const grandTotalRow = totalsTable.querySelector('tr.grand-total');
+
+            if (authHours > 0 && grandTotalRow) {
                 if (totalHoursBilled > authHours) {
                     const overage = (totalHoursBilled - authHours).toFixed(1);
-                    totalRows[5].cells[0].textContent = `⚠️ +${overage} hrs over auth`;
-                    totalRows[5].cells[0].style.cssText = 'background: #522; color: #ffcccc; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #f66; border-bottom: 2px solid #f66;';
-                    totalRows[5].cells[1].style.cssText = 'background: #522; border-top: 2px solid #f66; border-bottom: 2px solid #f66; border-left: none; border-right: none; color: #ffcccc;';
+                    grandTotalRow.cells[0].textContent = `⚠️ +${overage} hrs over auth`;
+                    grandTotalRow.cells[0].style.cssText = 'background: #522; color: #ffcccc; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #f66; border-bottom: 2px solid #f66;';
+                    grandTotalRow.cells[1].style.cssText = 'background: #522; border-top: 2px solid #f66; border-bottom: 2px solid #f66; border-left: none; border-right: none; color: #ffcccc;';
                 } else {
                     const remaining = (authHours - totalHoursBilled).toFixed(1);
-                    totalRows[5].cells[0].textContent = `✓ ${remaining} hrs remaining`;
-                    totalRows[5].cells[0].style.cssText = 'background: #252525; color: #6f6; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #666; border-bottom: 2px solid #666;';
-                    totalRows[5].cells[1].style.cssText = 'background: #252525; border-top: 2px solid #666; border-bottom: 2px solid #666; border-left: none; border-right: none; color: #6f6;';
+                    grandTotalRow.cells[0].textContent = `✓ ${remaining} hrs remaining`;
+                    grandTotalRow.cells[0].style.cssText = 'background: #252525; color: #6f6; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #666; border-bottom: 2px solid #666;';
+                    grandTotalRow.cells[1].style.cssText = 'background: #252525; border-top: 2px solid #666; border-bottom: 2px solid #666; border-left: none; border-right: none; color: #6f6;';
                 }
-            } else {
-                totalRows[5].cells[0].textContent = '';
-                totalRows[5].cells[0].style.cssText = '';
-                totalRows[5].cells[1].style.cssText = '';
+            } else if (grandTotalRow) {
+                grandTotalRow.cells[0].textContent = '';
+                grandTotalRow.cells[0].style.cssText = '';
+                grandTotalRow.cells[1].style.cssText = '';
             }
 
             // Update placeholder background visibility
@@ -1242,6 +1337,64 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             if (group) group.style.display = (model === 'custom') ? 'block' : 'none';
         }
 
+        function renderRateSchedulesTab() {
+            const container = document.getElementById('rate-schedules-container');
+            if (!container) return;
+            container.innerHTML = [
+                renderRateEditor('hourly',       'Hourly Rate ($/hr)'),
+                renderRateEditor('mileage',      'Mileage Rate ($/mi)'),
+                renderRateEditor('copies_bw',    'B&W Copy Rate ($/page)'),
+                renderRateEditor('copies_color', 'Color Copy Rate ($/page)'),
+            ].join('');
+        }
+
+        function renderRateEditor(type, label) {
+            const schedule = (CONFIG.RATE_SCHEDULES[type] || []).slice().sort((a, b) => new Date(b.effective) - new Date(a.effective));
+            const btnStyle = 'background:none;border:none;color:crimson;cursor:pointer;font-size:14px;padding:0 4px';
+            const inputStyle = 'padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px';
+            let rows = schedule.map((entry, i) =>
+                `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                    <input type="date" value="${entry.effective}" onchange="updateRateEntry('${type}',${i},'effective',this.value)" style="${inputStyle}">
+                    <span style="color:var(--muted);font-size:12px">$</span>
+                    <input type="number" step="0.001" min="0" value="${entry.rate}" onchange="updateRateEntry('${type}',${i},'rate',parseFloat(this.value)||0)" style="${inputStyle};width:80px">
+                    <button onclick="removeRateEntry('${type}',${i})" style="${btnStyle}" title="Remove">&#x2715;</button>
+                </div>`
+            ).join('');
+            return `<div class="settings-field">
+                <label>${label}</label>
+                <div id="rate-rows-${type}">${rows}</div>
+                <button onclick="addRateEntry('${type}')" style="font-size:11px;padding:4px 8px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);margin-top:2px">+ Add row</button>
+            </div>`;
+        }
+
+        function updateRateEntry(type, idx, field, value) {
+            const sorted = (CONFIG.RATE_SCHEDULES[type] || []).slice().sort((a, b) => new Date(b.effective) - new Date(a.effective));
+            sorted[idx][field] = value;
+            CONFIG.RATE_SCHEDULES[type] = sorted;
+        }
+
+        function removeRateEntry(type, idx) {
+            const sorted = (CONFIG.RATE_SCHEDULES[type] || []).slice().sort((a, b) => new Date(b.effective) - new Date(a.effective));
+            sorted.splice(idx, 1);
+            CONFIG.RATE_SCHEDULES[type] = sorted;
+            renderRateSchedulesTab();
+        }
+
+        function addRateEntry(type) {
+            if (!CONFIG.RATE_SCHEDULES[type]) CONFIG.RATE_SCHEDULES[type] = [];
+            CONFIG.RATE_SCHEDULES[type].unshift({ effective: '', rate: 0 });
+            renderRateSchedulesTab();
+        }
+
+        function readRateSchedulesFromUI() {
+            // Schedules are updated in-place via updateRateEntry, just return a deep copy
+            const result = {};
+            for (const type of ['hourly','mileage','copies_bw','copies_color']) {
+                result[type] = (CONFIG.RATE_SCHEDULES[type] || []).map(e => ({ ...e }));
+            }
+            return result;
+        }
+
         function openSettings() {
             document.getElementById('setting-webhook').value = CONFIG.GOOGLE_WEBHOOK_URL || '';
             document.getElementById('setting-ai-key').value = CONFIG.AI_API_KEY || '';
@@ -1265,6 +1418,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             
             // Default to the first tab (webhook)
             switchTab('webhook');
+            renderRateSchedulesTab();
 
             // Ensure fields are locked/unlocked per saved state
             const fieldIds = ['setting-webhook', 'setting-ai-key', 'setting-ai-model', 'setting-ai-instructions', 'setting-ai-base-url', 'setting-ai-temp', 'setting-ai-tokens'];
@@ -1417,7 +1571,8 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
             CONFIG.AI_BASE_URL = document.getElementById('setting-ai-base-url').value.trim();
             CONFIG.AI_TEMPERATURE = parseFloat(document.getElementById('setting-ai-temp').value);
             CONFIG.AI_MAX_TOKENS = parseInt(document.getElementById('setting-ai-tokens').value) || 2048;
-            
+            CONFIG.RATE_SCHEDULES = readRateSchedulesFromUI();
+
             localStorage.setItem('invoiceSettings', JSON.stringify({
                 webhook: CONFIG.GOOGLE_WEBHOOK_URL,
                 aiKey: CONFIG.AI_API_KEY,
@@ -1426,7 +1581,8 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 aiBaseUrl: CONFIG.AI_BASE_URL,
                 aiTemp: CONFIG.AI_TEMPERATURE,
                 aiTokens: CONFIG.AI_MAX_TOKENS,
-                locks: CONFIG.FIELD_LOCKS
+                locks: CONFIG.FIELD_LOCKS,
+                rateSchedules: CONFIG.RATE_SCHEDULES
             }));
             
             updateActiveModelDisplay();
@@ -1485,6 +1641,7 @@ Use complete sentences where helpful. Be specific (date, case #, description sni
                 CONFIG.AI_TEMPERATURE = settings.aiTemp || 0.7;
                 CONFIG.AI_MAX_TOKENS = settings.aiTokens || 2048;
                 CONFIG.FIELD_LOCKS = settings.locks || {};
+                if (settings.rateSchedules) CONFIG.RATE_SCHEDULES = settings.rateSchedules;
             }
 
             updateActiveModelDisplay();
@@ -2209,11 +2366,11 @@ ${payload}`;
                          let rateClass = '';
                          if (date) {
                              const serviceDate = parseLocalDate(date);
-                             if (!isNaN(serviceDate.getTime()) && serviceDate < CONFIG.RATE_CUTOFF_DATE) {
+                             if (!isNaN(serviceDate.getTime()) && getRateForDate(CONFIG.RATE_SCHEDULES.hourly, date) < getCurrentRate(CONFIG.RATE_SCHEDULES.hourly)) {
                                  rateClass = 'rate-55';
                              }
                          }
-                         
+
                          subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClass}"><td contenteditable="true">${date}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
                          importCount++;
                      }
@@ -2225,11 +2382,11 @@ ${payload}`;
                          let rateClassMileage = '';
                          if (date) {
                              const serviceDate = parseLocalDate(date);
-                             if (!isNaN(serviceDate.getTime()) && serviceDate.getFullYear() === 2025) {
+                             if (!isNaN(serviceDate.getTime()) && getRateForDate(CONFIG.RATE_SCHEDULES.mileage, date) < getCurrentRate(CONFIG.RATE_SCHEDULES.mileage)) {
                                  rateClassMileage = 'rate-55';
                              }
                          }
-                         
+
                          subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClassMileage}"><td contenteditable="true">${date}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
                          importCount++;
                       }
@@ -2240,7 +2397,7 @@ ${payload}`;
                         let amount = 0;
                         const catLower = category.toLowerCase();
                         if (catLower.includes('photocopy') || catLower.includes('copies')) {
-                            const rate = (catLower.includes('color')) ? CONFIG.COPY_RATE_COLOR : CONFIG.COPY_RATE_BW;
+                            const rate = (catLower.includes('color')) ? getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, date) : getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw, date);
                             amount = qty * rate;
                         }
 
@@ -2266,7 +2423,7 @@ ${payload}`;
                          let rateClass = '';
                          if (dateVal) {
                              const serviceDate = parseLocalDate(dateVal);
-                             if (!isNaN(serviceDate.getTime()) && serviceDate < CONFIG.RATE_CUTOFF_DATE) {
+                             if (!isNaN(serviceDate.getTime()) && getRateForDate(CONFIG.RATE_SCHEDULES.hourly, dateVal) < getCurrentRate(CONFIG.RATE_SCHEDULES.hourly)) {
                                  rateClass = 'rate-55';
                              }
                          }
@@ -2279,7 +2436,7 @@ ${payload}`;
                           let rateClassMileage = '';
                           if (cols[1]) {
                               const serviceDate = parseLocalDate(cols[1]);
-                              if (!isNaN(serviceDate.getTime()) && serviceDate.getFullYear() === 2025) {
+                              if (!isNaN(serviceDate.getTime()) && getRateForDate(CONFIG.RATE_SCHEDULES.mileage, cols[1]) < getCurrentRate(CONFIG.RATE_SCHEDULES.mileage)) {
                                   rateClassMileage = 'rate-55';
                               }
                           }
