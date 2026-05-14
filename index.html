@@ -209,6 +209,21 @@
         </div>
     </div>
 
+    <!-- TLI Header Warning Modal -->
+    <div id="tli-header-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content" style="max-width:520px;min-width:340px">
+            <div class="modal-header">
+                <span>⚠️ Column Layout Changed</span>
+                <button class="btn-close" onclick="document.getElementById('tli-header-modal').style.display='none'">&times;</button>
+            </div>
+            <div id="tli-header-modal-body" style="font-size:14px;line-height:1.7;margin-bottom:18px"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button id="tli-header-keep" class="btn" style="background:var(--surface2);border:1px solid var(--border)">Keep Saved Layout</button>
+                <button id="tli-header-save" class="btn" style="background:var(--accent);color:#000">Save New Layout</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal-overlay">
         <div class="modal-content">
@@ -529,6 +544,86 @@
             if (!schedule || !schedule.length) return 0;
             return schedule.reduce((max, e) => e.rate > max ? e.rate : max, 0);
         }
+
+        // ── TLI Column Layout ─────────────────────────────────────────────────────
+        // The canonical column names for a TLI Field Log export.
+        // Saved to localStorage as 'tliHeaders'; falls back to this default.
+        const DEFAULT_TLI_HEADERS = [
+            'Logged At', 'Case Number', 'Client Last Name', 'Client First Name',
+            'Activity Type', 'Date', 'Time', 'Duration (mins)', 'Tenths of Hours',
+            'Running Total', 'Quantity', 'Mileage', 'From', 'To', 'Investigator',
+            'Notes', 'Billed'
+        ];
+
+        function getTLIHeaders() {
+            try {
+                const saved = localStorage.getItem('tliHeaders');
+                if (saved) return JSON.parse(saved);
+            } catch(e) {}
+            return [...DEFAULT_TLI_HEADERS];
+        }
+
+        function saveTLIHeaders(headers) {
+            localStorage.setItem('tliHeaders', JSON.stringify(headers));
+        }
+
+        /** Build a named-column index map from a header array. */
+        function buildTLIColMap(headers) {
+            const idx = name => headers.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+            return {
+                caseNumber:   idx('Case Number'),
+                clientLast:   idx('Client Last Name'),
+                clientFirst:  idx('Client First Name'),
+                activityType: idx('Activity Type'),
+                date:         idx('Date'),
+                tenthsHours:  idx('Tenths of Hours'),
+                quantity:     idx('Quantity'),
+                mileage:      idx('Mileage'),
+                from:         idx('From'),
+                to:           idx('To'),
+                investigator: idx('Investigator'),
+                notes:        idx('Notes'),
+            };
+        }
+
+        /** Compare two header arrays; returns { added, removed, moved, changed }. */
+        function compareTLIHeaders(saved, incoming) {
+            const added   = incoming.filter(h => !saved.includes(h));
+            const removed = saved.filter(h => !incoming.includes(h));
+            const moved   = incoming.filter((h, i) => saved.includes(h) && saved.indexOf(h) !== i && !added.includes(h));
+            return { added, removed, moved, changed: added.length > 0 || removed.length > 0 || moved.length > 0 };
+        }
+
+        /**
+         * Show the TLI header change warning modal.
+         * onSave  — user chose to save the new layout (and proceed with it)
+         * onKeep  — user chose to keep the saved layout (and proceed with it)
+         */
+        function showTLIHeaderWarning(savedHeaders, newHeaders, onSave, onKeep) {
+            const diff = compareTLIHeaders(savedHeaders, newHeaders);
+            let msg = '<p style="margin-bottom:10px">The pasted data has a <strong>different column layout</strong> than saved:</p><ul style="margin-left:16px;line-height:1.9">';
+            if (diff.added.length)   msg += diff.added.map(h   => `<li>➕ Added: <strong>${h}</strong></li>`).join('');
+            if (diff.removed.length) msg += diff.removed.map(h => `<li>➖ Removed: <strong>${h}</strong></li>`).join('');
+            if (diff.moved.length)   msg += diff.moved.map(h   => `<li>↔️ Moved: <strong>${h}</strong></li>`).join('');
+            msg += '</ul><p style="margin-top:10px;font-size:12px;color:var(--muted)">Save New Layout = use and remember the new columns. Keep Saved = parse with current saved layout.</p>';
+            document.getElementById('tli-header-modal-body').innerHTML = msg;
+
+            const overlay  = document.getElementById('tli-header-modal');
+            const saveBtn  = document.getElementById('tli-header-save');
+            const keepBtn  = document.getElementById('tli-header-keep');
+
+            // Replace buttons to clear any old listeners
+            const newSaveBtn = saveBtn.cloneNode(true);
+            const newKeepBtn = keepBtn.cloneNode(true);
+            saveBtn.replaceWith(newSaveBtn);
+            keepBtn.replaceWith(newKeepBtn);
+
+            newSaveBtn.addEventListener('click', () => { overlay.style.display = 'none'; onSave(); });
+            newKeepBtn.addEventListener('click', () => { overlay.style.display = 'none'; onKeep(); });
+
+            overlay.style.display = 'flex';
+        }
+        // ─────────────────────────────────────────────────────────────────────────
 
         const CONFIG = {
             RATE_SCHEDULES: {
@@ -2299,56 +2394,99 @@ ${payload}`;
             handleDataImport(text);
         }
 
+        /**
+         * Entry point for TLI data import.
+         * Handles header detection, layout comparison, and routes to _doTLIImport().
+         */
         function handleDataImport(rawText) {
             if (!rawText || !rawText.trim()) return;
 
-            // Require TLI header for proper column mapping
-            const hasTLIHeader = rawText.includes("Logged At") && rawText.includes("Tenths of Hours");
-            if (!hasTLIHeader) {
-                alert("Invalid paste format. Please paste the full TLI export including the header row with column names:\nLogged At\tCase Number\tClient Last Name\tClient First Name\tActivity Type\tDate\tTime\tDuration (mins)\tTenths of Hours\t...");
-                return;
+            const lines = rawText.split('\n');
+
+            // Find the first non-empty line that looks like a TLI header
+            let headerLineIdx = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim() && lines[i].includes('Logged At')) {
+                    headerLineIdx = i;
+                    break;
+                }
             }
 
-            // Split on newline, keep empty lines for index alignment
-            const lines = rawText.split('\n');
+            const savedHeaders = getTLIHeaders();
+
+            if (headerLineIdx >= 0) {
+                // Extract the header columns from the paste
+                const incomingHeaders = lines[headerLineIdx].split('\t').map(h => h.trim());
+                const diff = compareTLIHeaders(savedHeaders, incomingHeaders);
+
+                if (diff.changed) {
+                    // Ask user whether to save the new layout or keep old
+                    showTLIHeaderWarning(
+                        savedHeaders, incomingHeaders,
+                        () => {
+                            // Save new layout and import with it
+                            saveTLIHeaders(incomingHeaders);
+                            _doTLIImport(lines, headerLineIdx, buildTLIColMap(incomingHeaders));
+                        },
+                        () => {
+                            // Keep saved layout and import with it
+                            _doTLIImport(lines, headerLineIdx, buildTLIColMap(savedHeaders));
+                        }
+                    );
+                    return; // Continues inside the callbacks above
+                }
+                // Headers match — proceed with saved layout
+                _doTLIImport(lines, headerLineIdx, buildTLIColMap(savedHeaders));
+            } else {
+                // No header row in the paste — use saved layout silently
+                _doTLIImport(lines, -1, buildTLIColMap(savedHeaders));
+            }
+        }
+
+        /**
+         * Core import logic. Parses lines using the provided column map.
+         * @param {string[]} lines        - All lines from the paste
+         * @param {number}   headerIdx    - Index of the header line (-1 if none)
+         * @param {Object}   colMap       - Named column → index map from buildTLIColMap()
+         */
+        function _doTLIImport(lines, headerIdx, colMap) {
             let importCount = 0;
-            let firstInvestigator = null; // Capture from TLI rows
+            let firstInvestigator = null;
 
             lines.forEach((line, index) => {
                 if (!line.trim()) return;
-                // Detect and skip TLI Log header if present
-                if (line.includes("Logged At") && line.includes("Tenths of Hours")) return;
+                if (index === headerIdx) return; // Skip the header line
 
-                let cols = line.split('\t'); // Google Sheets/Excel default
+                let cols = line.split('\t');
                 if (cols.length < 2) cols = line.split(',');
-                
                 if (cols.length < 2) return;
+
+                // Pad missing trailing columns (empty cells collapse on split)
+                const minLen = Math.max(...Object.values(colMap).filter(v => v >= 0)) + 1;
+                while (cols.length < minLen) cols.push('');
 
                 // Pad or trim cols to expected lengths for each format
                 const isLegacyHours = cols.length === 5;
                 const isLegacyMileage = cols.length === 4;
                 const isLegacyExpenses = cols.length === 6;
-                const isTLI = cols.length >= 12; // Accept TLI-like rows (pad to 16)
+                const isTLI = cols.length >= 12; // Accept TLI-like rows
 
                 if (isTLI) {
-                    // Pad missing trailing columns (empty cells collapse on split)
-                    while (cols.length < 16) cols.push('');
-                    const caseNumber = cols[1].trim() || "Unspecified";
-                    const date = cols[5].trim();
-                    const category = cols[4].trim();
-                    const investigator = cols[14] ? cols[14].trim() : '';
-                    // Capture first investigator encountered
-                    if (investigator && !firstInvestigator) {
-                        firstInvestigator = investigator;
-                    }
-                    const hours = parseFloat(cols[8]) || 0;
-                    const qty = parseFloat(cols[10]) || 0;
-                    const miles = parseFloat(cols[11]) || 0;
-                    const description = cols[15] ? cols[15].trim() : '';
-                    let route = `${cols[12].trim()} → ${cols[13].trim()}`;
-                    if (investigator) {
-                        route += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Driver: ${investigator})`;
-                    }
+                    const caseNumber   = colMap.caseNumber   >= 0 ? (cols[colMap.caseNumber]   || '').trim() || 'Unspecified' : 'Unspecified';
+                    const date         = colMap.date         >= 0 ? (cols[colMap.date]         || '').trim() : '';
+                    const category     = colMap.activityType >= 0 ? (cols[colMap.activityType] || '').trim() : '';
+                    const investigator = colMap.investigator >= 0 ? (cols[colMap.investigator] || '').trim() : '';
+                    const hours        = colMap.tenthsHours  >= 0 ? parseFloat(cols[colMap.tenthsHours])  || 0 : 0;
+                    const qty          = colMap.quantity     >= 0 ? parseFloat(cols[colMap.quantity])     || 0 : 0;
+                    const miles        = colMap.mileage      >= 0 ? parseFloat(cols[colMap.mileage])      || 0 : 0;
+                    const description  = colMap.notes        >= 0 ? (cols[colMap.notes]        || '').trim() : '';
+                    const fromLoc      = colMap.from         >= 0 ? (cols[colMap.from]         || '').trim() : '';
+                    const toLoc        = colMap.to           >= 0 ? (cols[colMap.to]           || '').trim() : '';
+
+                    if (investigator && !firstInvestigator) firstInvestigator = investigator;
+
+                    let route = `${fromLoc} → ${toLoc}`;
+                    if (investigator) route += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Driver: ${investigator})`;
 
                     const type = normalizeCategory(category);
 
