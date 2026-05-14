@@ -2034,22 +2034,25 @@ ${payload}`;
             const listEl = modal.querySelector('#name-assignments-list');
             let selectedIndices = new Set();
             const rowElements = [];
+            const mergedLog = []; // { name, mergedInto } — keeps the trail visible
             
             function renderRows() {
                 listEl.innerHTML = '';
                 rowElements.length = 0;
+
+                // ── Active rows (bright) ─────────────────────────────────────
                 assignments.forEach((item, idx) => {
                     const row = document.createElement('div');
-                    row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;align-items:center';
+                    row.style.cssText = 'display:grid;grid-template-columns:40px 1.5fr 130px 80px;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--accent2);border-radius:8px;margin-bottom:6px;align-items:center';
                     row.dataset.idx = idx;
-                    
+
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.className = 'row-select';
                     checkbox.dataset.idx = idx;
-                    
+
                     const nameDiv = document.createElement('div');
-                    nameDiv.style.cssText = 'font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                    nameDiv.style.cssText = 'font-size:13px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
                     nameDiv.title = item.name;
                     nameDiv.textContent = item.name;
                     if (item.fromHeader) {
@@ -2135,6 +2138,24 @@ ${payload}`;
                         updatePreview();
                     });
                 });
+
+                // ── Merged-log rows (subdued) ────────────────────────────────
+                if (mergedLog.length > 0) {
+                    const divider = document.createElement('div');
+                    divider.style.cssText = 'font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px 0;padding-left:4px;border-top:1px solid var(--border);padding-top:8px';
+                    divider.textContent = 'Merged (removed)';
+                    listEl.appendChild(divider);
+
+                    mergedLog.forEach(({ name, mergedInto }) => {
+                        const row = document.createElement('div');
+                        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:1px dashed var(--border);border-radius:6px;margin-bottom:4px;opacity:0.55';
+                        row.innerHTML = `
+                            <span style="font-size:13px;color:var(--muted);text-decoration:line-through;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${name}">${name}</span>
+                            <span style="font-size:11px;color:var(--muted);white-space:nowrap">↳ merged → <strong style="color:var(--text)">${mergedInto}</strong></span>
+                        `;
+                        listEl.appendChild(row);
+                    });
+                }
             }
             
             renderRows();
@@ -2221,15 +2242,19 @@ ${payload}`;
                         return;
                     }
                     
-                    // Collect cases from selected rows
+                    // Collect cases from selected rows; log merged-away names
                     const newCases = new Set();
-                    const selectedArray = Array.from(selectedIndices).sort((a,b) => b - a); // descending for safe removal
+                    const selectedArray = Array.from(selectedIndices).sort((a,b) => b - a); // descending for safe splice
                     for (const idx of selectedArray) {
                         const item = assignments[idx];
                         item.cases.forEach(c => newCases.add(c));
+                        // Record in merged log (only if name differs from canonical)
+                        if (item.name !== canonicalName) {
+                            mergedLog.push({ name: item.name, mergedInto: canonicalName });
+                        }
                         assignments.splice(idx, 1);
                     }
-                    // Insert merged entry at position of first (smallest index)
+                    // Insert canonical entry at position of first selected
                     const insertIdx = Math.min(...selectedIndices);
                     assignments.splice(insertIdx, 0, {
                         name: canonicalName,
@@ -2323,12 +2348,23 @@ ${payload}`;
                     }
                 }
 
-                // Apply replacements
+                // Apply replacements for active assignments
+                const canonicalReplacements = new Map(); // canonical name (lower) → replacement text
                 assignments.forEach(item => {
                     if (item.label === 'skip') return;
                     const replacement = `${getLabelText(item)} ${item.finalNum}`;
+                    canonicalReplacements.set(item.name.toLowerCase(), replacement);
                     rows.forEach(({ element }) => {
                         element.textContent = element.textContent.replace(item.name, replacement);
+                    });
+                });
+
+                // Also replace merged-away name variants with the same canonical replacement
+                mergedLog.forEach(({ name, mergedInto }) => {
+                    const replacement = canonicalReplacements.get(mergedInto.toLowerCase());
+                    if (!replacement) return;
+                    rows.forEach(({ element }) => {
+                        element.textContent = element.textContent.replace(name, replacement);
                     });
                 });
 
