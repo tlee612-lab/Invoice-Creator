@@ -175,9 +175,9 @@
         table td { padding: 6px; border-bottom: 1px solid var(--border); white-space: nowrap; color: var(--text); }
         table tr.case-header td { background: var(--surface); font-weight: bold; padding-top: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
         table tr.subtotal td { background: var(--surface2); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding-top: 6px; padding-bottom: 6px; color: var(--text); }
-        table tr.grand-total td { background: var(--surface2); color: var(--accent); font-weight: bold; border-top: 2px solid var(--accent); padding: 8px 6px; }
+        table tr.grand-total td { background: var(--surface2); color: var(--text); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
-        .invoice-totals-table tbody tr:nth-child(-n+5) td:nth-child(2) { border-right: 2px solid var(--accent); }
+        .invoice-totals-table tbody td:nth-child(2) { border-right: 2px solid var(--border); }
         .blue-text { color: var(--border); }
         tr.rate-55 td { color: var(--border); }
         .totals-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border); }
@@ -805,9 +805,11 @@
                                     currentRow :
                                     mileageTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
                 if (subtotalRow && subtotalRow.cells.length >= 2) {
-                    const sorted = [...caseMilesByRate.entries()].sort((a, b) => a[0] - b[0]);
                     const maxRate = getCurrentRate(CONFIG.RATE_SCHEDULES.mileage);
-                    const parts = sorted.map(([rate, mi]) => {
+                    // Always show every rate tier (even 0.0) so the split is visible for verification
+                    const allRates = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
+                    const parts = allRates.map(rate => {
+                        const mi = caseMilesByRate.get(rate) || 0;
                         const text = `Mileage @ $${rate}: ${mi.toFixed(1)}`;
                         return rate < maxRate ? `<span class="blue-text">${text}</span>` : text;
                     });
@@ -968,8 +970,8 @@
             // Grand total row
             rows.push(`<tr class="grand-total">
                 <td></td><td></td><td></td><td></td>
-                <td style="text-align:right;border-bottom:2px solid #666">TOTAL:</td>
-                <td class="amount-col" id="field-grand-total" style="border-bottom:2px solid #666">$${grandTotal.toFixed(2)}</td>
+                <td style="text-align:right">TOTAL:</td>
+                <td class="amount-col" id="field-grand-total">$${grandTotal.toFixed(2)}</td>
             </tr>`);
 
             totalsTable.innerHTML = rows.join('');
@@ -984,13 +986,13 @@
                 if (totalHoursBilled > authHours) {
                     const overage = (totalHoursBilled - authHours).toFixed(1);
                     grandTotalRow.cells[0].textContent = `⚠️ +${overage} hrs over auth`;
-                    grandTotalRow.cells[0].style.cssText = 'background: #522; color: #ffcccc; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #f66; border-bottom: 2px solid #f66;';
-                    grandTotalRow.cells[1].style.cssText = 'background: #522; border-top: 2px solid #f66; border-bottom: 2px solid #f66; border-left: none; border-right: none; color: #ffcccc;';
+                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:var(--warning, #f88);';
+                    grandTotalRow.cells[1].style.cssText = '';
                 } else {
                     const remaining = (authHours - totalHoursBilled).toFixed(1);
                     grandTotalRow.cells[0].textContent = `✓ ${remaining} hrs remaining`;
-                    grandTotalRow.cells[0].style.cssText = 'background: #252525; color: #6f6; font-weight: bold; text-align: left; padding: 4px; border-top: 2px solid #666; border-bottom: 2px solid #666;';
-                    grandTotalRow.cells[1].style.cssText = 'background: #252525; border-top: 2px solid #666; border-bottom: 2px solid #666; border-left: none; border-right: none; color: #6f6;';
+                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:var(--accent);';
+                    grandTotalRow.cells[1].style.cssText = '';
                 }
             } else if (grandTotalRow) {
                 grandTotalRow.cells[0].textContent = '';
@@ -2403,55 +2405,105 @@ ${payload}`;
             const vendorNum = vendorMatch ? vendorMatch[1].replace(/-/g, ' ') : 'vendor';
             const paeEl = document.getElementById('field-pae');
             const paeVal = getFieldValue(paeEl);
-            const filename = paeVal ? `Vendor ${vendorNum} PAE ${paeVal}.pdf` : `Vendor ${vendorNum}.pdf`;
+            const filename = paeVal ? `Invoice Vendor ${vendorNum} PAE ${paeVal}.pdf` : `Invoice Vendor ${vendorNum}.pdf`;
+
+            // Show loading toast
+            const ind = document.getElementById('save-indicator');
+            const origText = ind.textContent;
+            ind.textContent = '⏳ Generating PDF…';
+            ind.classList.add('visible');
 
             // Clone invoice and apply print-friendly styles to the clone only
             const clone = invoiceEl.cloneNode(true);
             applyPrintStyles(clone);
 
-            // Create modal overlay for preview
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:3000;padding:20px';
-            const modal = document.createElement('div');
-            modal.className = 'modal-content';
-            modal.style.cssText = 'background:#fff;border-radius:8px;padding:16px;max-width:90vw;max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
-            modal.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <div style="font-weight:bold;font-size:16px;color:#000">Invoice Preview — Save as PDF</div>
-                    <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">&times;</button>
-                </div>
-                <div id="pdf-preview" style="flex:1;overflow:auto;border:1px solid #ddd;padding:16px;background:#fff"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end">
-                    <button id="btn-cancel-pdf" style="padding:8px 16px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer">Cancel</button>
-                    <button id="btn-save-pdf" style="padding:8px 16px;border-radius:4px;border:none;background:#0066cc;color:#fff;cursor:pointer">💾 Save PDF</button>
-                </div>
-            `;
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
+            // Add page-break hints so tables don't split rows awkwardly
+            clone.querySelectorAll('tr').forEach(tr => {
+                tr.style.setProperty('page-break-inside', 'avoid', 'important');
+                tr.style.setProperty('break-inside', 'avoid', 'important');
+            });
+            clone.querySelectorAll('.subtotal, .case-header').forEach(el => {
+                el.style.setProperty('page-break-inside', 'avoid', 'important');
+                el.style.setProperty('break-inside', 'avoid', 'important');
+            });
+            clone.querySelectorAll('.section-heading, .invoice-section > h2, .invoice-section > h3').forEach(el => {
+                el.style.setProperty('page-break-after', 'avoid', 'important');
+                el.style.setProperty('break-after', 'avoid', 'important');
+            });
+            clone.querySelectorAll('.invoice-totals-table, .invoice-totals-table tr').forEach(el => {
+                el.style.setProperty('page-break-inside', 'avoid', 'important');
+                el.style.setProperty('break-inside', 'avoid', 'important');
+            });
 
-            const previewContainer = modal.querySelector('#pdf-preview');
-            previewContainer.appendChild(clone);
+            // Place clone in an off-screen container for rendering (never shown to user)
+            const offscreen = document.createElement('div');
+            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;background:#fff';
+            offscreen.appendChild(clone);
+            document.body.appendChild(offscreen);
 
-            // Cancel button
-            modal.querySelector('#btn-cancel-pdf').onclick = () => overlay.remove();
+            try {
+                // Generate PDF as a blob so we can use the save-file picker
+                const pdfBlob = await html2pdf().set({
+                    margin:      0.4,
+                    filename:    filename,
+                    image:       { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
+                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
+                }).from(clone).output('blob');
 
-            // Save button: generate PDF from the styled clone
-            modal.querySelector('#btn-save-pdf').onclick = async () => {
-                try {
-                    await html2pdf().set({
-                        margin:       0.4,
-                        filename:     filename,
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-                        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-                    }).from(clone).save();
-                    overlay.remove();
-                } catch (err) {
-                    console.error('PDF generation failed:', err);
-                    alert('Failed to generate PDF: ' + err.message);
+                // Try File System Access API — lets user choose save location
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{ description: 'PDF file', accept: { 'application/pdf': ['.pdf'] } }],
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(pdfBlob);
+                        await writable.close();
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            // User cancelled — clear toast and bail
+                            ind.textContent = origText;
+                            ind.classList.remove('visible');
+                            return;
+                        }
+                        // Picker unavailable — fall through to standard download
+                        console.warn('showSaveFilePicker failed, using fallback:', err);
+                        _pdfFallbackDownload(pdfBlob, filename);
+                    }
+                } else {
+                    // Fallback for Firefox / file:// / older browsers
+                    _pdfFallbackDownload(pdfBlob, filename);
                 }
-            };
+
+                ind.textContent = '✔ PDF saved';
+                clearTimeout(ind._pdfTimeout);
+                ind._pdfTimeout = setTimeout(() => {
+                    ind.textContent = origText;
+                    ind.classList.remove('visible');
+                }, 3000);
+            } catch (err) {
+                console.error('PDF generation failed:', err);
+                ind.textContent = '⚠ PDF failed — see console';
+                clearTimeout(ind._pdfTimeout);
+                ind._pdfTimeout = setTimeout(() => {
+                    ind.textContent = origText;
+                    ind.classList.remove('visible');
+                }, 4000);
+            } finally {
+                offscreen.remove();
+            }
+        }
+
+        function _pdfFallbackDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         // Get readable field value, skipping placeholder text
@@ -2554,7 +2606,7 @@ ${payload}`;
 
             if (headerLineIdx >= 0) {
                 // Extract the header columns from the paste
-                const incomingHeaders = lines[headerLineIdx].split('\t').map(h => h.trim());
+                const incomingHeaders = lines[headerLineIdx].split('\t').map(h => h.trim()).filter(h => h !== '');
                 const diff = compareTLIHeaders(savedHeaders, incomingHeaders);
 
                 if (diff.changed) {
