@@ -2207,8 +2207,7 @@ ${payload}`;
                 mergeModal.querySelectorAll('input[name="merge-pick"]').forEach(radio => {
                     radio.addEventListener('change', () => { canonicalInput.value = radio.value; });
                 });
-                
-                const canonicalInput = mergeModal.querySelector('#merge-canonical');
+
                 const labelSelect = mergeModal.querySelector('#merge-label');
                 const numberInput = mergeModal.querySelector('#merge-number');
                 
