@@ -1995,6 +1995,7 @@ ${payload}`;
                 </div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
                     <button id="mergeSelectedBtn" style="padding:10px 16px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer;display:none">Merge Selected</button>
+                    <button id="resetAssignmentsBtn" style="padding:10px 16px;border-radius:8px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer">↩ Reset</button>
                     <button id="applyNameLabels" style="padding:10px 16px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--bg);font-family:var(--ui);font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer">Proceed</button>
                 </div>
             `;
@@ -2151,15 +2152,25 @@ ${payload}`;
                 const mergeModal = document.createElement('div');
                 mergeModal.className = 'modal-content';
                 mergeModal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:500px;width:100%';
+                // Build the radio list of selected names
+                const selectedArray = Array.from(selectedIndices).sort((a, b) => a - b);
+                const radioOptions = selectedArray.map((idx, i) =>
+                    `<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);margin-bottom:4px">
+                        <input type="radio" name="merge-pick" value="${assignments[idx].name}" ${i === 0 ? 'checked' : ''} style="accent-color:var(--accent)">
+                        <span style="font-size:13px;color:var(--text)">${assignments[idx].name}</span>
+                     </label>`
+                ).join('');
+
                 mergeModal.innerHTML = `
                     <div style="font-family:var(--ui);font-weight:800;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:16px">Merge Selected Names</div>
-                    <div style="margin-bottom:12px;font-size:12px;color:var(--muted)">
-                        Enter the correct spelling of the name and choose a label/number. All selected name variants will be combined into this single entry.
+                    <div style="margin-bottom:10px;font-size:12px;color:var(--muted)">Select which name to keep, then adjust spelling if needed. All others will be merged into it.</div>
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Keep this name:</label>
+                        ${radioOptions}
                     </div>
                     <div style="margin-bottom:12px">
-                        <label style="display:block;font-size:12px;margin-bottom:4px">Canonical Name:</label>
-                        <input type="text" id="merge-canonical" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
-                        <div style="font-size:11px;color:var(--muted);margin-top:4px">Suggested: use the most complete/misspelling-free version</div>
+                        <label style="display:block;font-size:12px;margin-bottom:4px">Canonical Name <span style="color:var(--muted)">(edit spelling if needed)</span>:</label>
+                        <input type="text" id="merge-canonical" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;box-sizing:border-box">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
                         <div>
@@ -2187,10 +2198,15 @@ ${payload}`;
                 `;
                 mergeOverlay.appendChild(mergeModal);
                 document.body.appendChild(mergeOverlay);
-                
-                // Pre-fill canonical name from first selected item
-                const firstIdx = Array.from(selectedIndices)[0];
-                document.getElementById('merge-canonical').value = assignments[firstIdx].name;
+
+                // Pre-fill canonical input from the checked radio (first selected by default)
+                const canonicalInput = mergeModal.querySelector('#merge-canonical');
+                canonicalInput.value = assignments[selectedArray[0]].name;
+
+                // Clicking a radio updates the canonical input
+                mergeModal.querySelectorAll('input[name="merge-pick"]').forEach(radio => {
+                    radio.addEventListener('change', () => { canonicalInput.value = radio.value; });
+                });
                 
                 const canonicalInput = mergeModal.querySelector('#merge-canonical');
                 const labelSelect = mergeModal.querySelector('#merge-label');
@@ -2215,8 +2231,8 @@ ${payload}`;
                     
                     // Collect cases from selected rows; log merged-away names
                     const newCases = new Set();
-                    const selectedArray = Array.from(selectedIndices).sort((a,b) => b - a); // descending for safe splice
-                    for (const idx of selectedArray) {
+                    const spliceOrder = Array.from(selectedIndices).sort((a,b) => b - a); // descending for safe splice
+                    for (const idx of spliceOrder) {
                         const item = assignments[idx];
                         item.cases.forEach(c => newCases.add(c));
                         // Record in merged log (only if name differs from canonical)
@@ -2278,8 +2294,18 @@ ${payload}`;
                 previewEl.innerHTML = html;
             }
             
-             // Initial preview
-             updatePreview();
+            // Initial preview
+            updatePreview();
+
+            // Snapshot of AI's original assignments — used by the Reset button
+            const initialAssignments = assignments.map(a => ({ ...a }));
+
+            document.getElementById('resetAssignmentsBtn').onclick = () => {
+                // Deep-restore every assignment to the AI's original suggestion
+                initialAssignments.forEach((orig, i) => { Object.assign(assignments[i], orig); });
+                renderRows();
+                updatePreview();
+            };
 
             // Inline error bar inside the modal (shown on conflict, cleared on re-attempt)
             const applyErrorEl = modal.querySelector('#apply-error') || (() => {
@@ -3032,6 +3058,7 @@ ${payload}`;
 
             // 3. Wire up row add/move/delete controls
             setupRowActions();
+
 
             // Auto-populate version label from GitHub API (latest commit on main)
             fetch('https://api.github.com/repos/tlee612-lab/Invoice-Creator/commits/main')
