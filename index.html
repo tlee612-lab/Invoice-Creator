@@ -1621,8 +1621,10 @@ If nothing needs fixing return: []`;
                 ind.classList.remove('visible');
 
                 if (corrections.length === 0) {
-                    ind.textContent = '✓ No spelling issues found'; ind.classList.add('visible');
-                    setTimeout(() => ind.classList.remove('visible'), 3000);
+                    // Show first 200 chars of AI response to help diagnose false negatives
+                    const preview = result.replace(/\n/g, ' ').slice(0, 200);
+                    ind.textContent = `✓ No issues found — AI said: ${preview}`; ind.classList.add('visible');
+                    setTimeout(() => ind.classList.remove('visible'), 12000);
                     return;
                 }
                 _showSpellCheckModal(corrections, cells);
