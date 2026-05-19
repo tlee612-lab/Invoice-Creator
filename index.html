@@ -169,7 +169,7 @@
         @media print { .print-hide { display: none !important; } }
         table tr.grand-total td { background: var(--surface2); color: var(--text); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
-        .invoice-totals-table { table-layout: fixed; }
+        .invoice-totals-table { table-layout: auto; }
         .invoice-totals-table tbody td:nth-child(2) { border-right: 2px solid var(--border); }
         .blue-text { color: var(--border); }
         tr.rate-55 td { color: var(--border); }
@@ -2859,6 +2859,17 @@ ${payload}`;
                     cells[0].colSpan = totalCols - (cells.length - 1);
                 });
             });
+
+            // Invoice totals table: let it size itself (auto layout) so copy-info
+            // and auth-hours text in the narrow left columns aren't clipped
+            const totalsClone = clone.querySelector('.invoice-totals-table');
+            if (totalsClone) {
+                totalsClone.style.tableLayout = 'auto';
+                totalsClone.querySelectorAll('td, th').forEach(cell => {
+                    cell.style.overflow    = 'visible';
+                    cell.style.whiteSpace  = 'normal';
+                });
+            }
 
             // Page-break hints
             clone.querySelectorAll('tr, .subtotal, .case-header').forEach(el => {
