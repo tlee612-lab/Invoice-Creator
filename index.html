@@ -85,27 +85,17 @@
         #import-zone button:hover { background: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }
 
         .invoice-container { max-width: 950px; margin: 0 auto; background: var(--surface); padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: var(--text); }
-        @media print { 
-            #import-zone, #ai-results, .modal-overlay { display: none !important; } 
-            body { background: white !important; margin: 0; padding: 0; }
-            .invoice-container { 
+        @media print {
+            #import-zone, #ai-results, .modal-overlay { display: none !important; }
+            body { margin: 0; padding: 0; }
+            .invoice-container {
                 max-width: 100% !important;
                 box-shadow: none !important;
                 padding: 0.75in 0.5in 0.75in 0.5in !important;
-                background: white !important;
-                color: black !important;
-            }
-            .invoice-container, .invoice-container * { 
-                background: white !important;
-                color: black !important;
-                border-color: black !important;
-            }
-            table, th, td {
-                border-color: black !important;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
             }
             .placeholder-bg, [contenteditable="true"] {
-                background: white !important;
-                color: black !important;
                 border: none !important;
                 outline: none !important;
                 box-shadow: none !important;
@@ -114,9 +104,7 @@
                 border: none !important;
                 outline: none !important;
                 box-shadow: none !important;
-                background: white !important;
             }
-            .header { border-bottom-color: black !important; }
             .pae-dates-flex {
                 flex-wrap: nowrap !important;
                 gap: 8px !important;
@@ -124,7 +112,6 @@
             .pae-dates-flex div {
                 white-space: nowrap;
             }
-            .subtotal { border-top: 2px solid black !important; border-bottom: 2px solid black !important; }
             #row-action-bar, .add-row-btn { display: none !important; }
         }
 
@@ -2748,20 +2735,8 @@ ${payload}`;
             confirmResolve = null;
         }
 
-        // Apply print-friendly styles recursively with !important to override dark theme
-        function applyPrintStyles(el) {
-            // Set inline styles with !important priority
-            el.style.setProperty('color', '#000000', 'important');
-            el.style.setProperty('background-color', '#ffffff', 'important');
-            el.style.setProperty('border', 'none', 'important');
-            el.style.setProperty('border-color', 'transparent', 'important');
-            el.querySelectorAll('*').forEach(child => {
-                child.style.setProperty('color', '#000000', 'important');
-                child.style.setProperty('background-color', '#ffffff', 'important');
-                child.style.setProperty('border', 'none', 'important');
-                child.style.setProperty('border-color', 'transparent', 'important');
-            });
-        }
+        // applyPrintStyles — intentionally empty; color inlining is handled by inlineColors() below
+        function applyPrintStyles(el) { }
 
         async function downloadPdf() {
             const invoiceEl = document.querySelector('.invoice-container');
