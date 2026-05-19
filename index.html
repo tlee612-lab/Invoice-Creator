@@ -1058,13 +1058,13 @@
             if (authHours > 0 && grandTotalRow) {
                 const diff = parseFloat((totalHoursBilled - authHours).toFixed(1));
                 if (diff > 0) {
-                    grandTotalRow.cells[0].textContent = `⚠ +${diff.toFixed(1)} hrs over auth`;
+                    grandTotalRow.cells[0].textContent = `⚠ Authorization exceeded +${diff.toFixed(1)} hrs`;
                     grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:#f66;';
                 } else if (diff < 0) {
-                    grandTotalRow.cells[0].textContent = `↓ ${Math.abs(diff).toFixed(1)} hrs remaining`;
+                    grandTotalRow.cells[0].textContent = `Authorization remaining: ${Math.abs(diff).toFixed(1)} hrs`;
                     grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:#6af;';
                 } else {
-                    grandTotalRow.cells[0].textContent = `✓ Exactly on auth`;
+                    grandTotalRow.cells[0].textContent = `✓ Authorized hours met`;
                     grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:#6c6;';
                 }
                 grandTotalRow.cells[1].style.cssText = '';
