@@ -753,7 +753,26 @@
             });
         }
 
+        function sortTableByDate(tableId) {
+            const tbody = document.getElementById(tableId)?.querySelector('tbody');
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.case-header):not(.subtotal)'));
+            rows.sort((a, b) => {
+                const da = parseLocalDate(a.cells[0]?.textContent.trim() || '');
+                const db = parseLocalDate(b.cells[0]?.textContent.trim() || '');
+                const ta = isNaN(da) ? Infinity : da.getTime();
+                const tb = isNaN(db) ? Infinity : db.getTime();
+                return ta - tb;
+            });
+            // Re-insert sorted rows before the first subtotal (or at end of tbody)
+            const firstSubtotal = tbody.querySelector('.subtotal');
+            rows.forEach(tr => tbody.insertBefore(tr, firstSubtotal || null));
+        }
+
         function updateInvoiceTotals() {
+            sortTableByDate('table-hours');
+            sortTableByDate('table-mileage');
+            sortTableByDate('table-expenses');
             normalizeCategoryText();
             let totalExpenses = 0;
             let allServiceDates = [];
