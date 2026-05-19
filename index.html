@@ -2129,9 +2129,17 @@ If nothing to fix: []`;
 
         // Name conversion via AI — extracts names from service hours and assigns labels
         async function convertNamesToCodes() {
-            // 1. Collect all service hours rows with case numbers
+            // 1. Collect all service hours AND expense rows with case numbers
             const rows = [];
             document.querySelectorAll('#table-hours tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                if (cells.length >= 4) {
+                    const desc = cells[3].textContent.trim();
+                    const caseNum = cells[1]?.textContent.trim() || 'Unknown';
+                    rows.push({ desc, case: caseNum, element: cells[3] });
+                }
+            });
+            document.querySelectorAll('#table-expenses tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
                 const cells = tr.querySelectorAll('td');
                 if (cells.length >= 4) {
                     const desc = cells[3].textContent.trim();
@@ -2166,42 +2174,34 @@ If nothing to fix: []`;
 
              const prompt = `Extract PERSON NAME MENTIONS from structured task log entries.
 
-This output is used for human review and final determination. The system must be lossless and must NOT interpret identity.
+This output is used for human review. Be lossless — when in doubt, include the name.
 
 RULES:
 
-1. Extract all text that appears to refer to a person name, including:
-   - full names
-   - first names only
-   - last names only
-   - initials
-   - partial or abbreviated forms
+1. Extract all text that appears to refer to a person, including:
+   - Full names (ALWAYS extract as a single string, e.g. "Leslie Ramano" not split into "Leslie" and "Ramano")
+   - First names only
+   - Last names only
+   - Initials
 
-2. Preserve names EXACTLY as written in the input.
-   - Do NOT modify spelling
-   - Do NOT normalize
-   - Do NOT expand names
+2. Preserve names EXACTLY as written — do NOT modify spelling, normalize, or expand.
 
-3. Do NOT perform any of the following:
-   - Do NOT merge name variants
-   - Do NOT infer that similar names refer to the same person
-   - Do NOT attach surnames
-   - Do NOT group or cluster names
-   - Do NOT resolve identities (e.g. Steve vs Steven are separate)
+3. Do NOT merge variants or infer identity. "Steve" and "Steven" are separate entries.
 
-4. Extract names even if ambiguous or partial.
-   - If it looks like a person reference, include it.
+4. CRITICAL — when a first name and last name appear together, extract the full name as one entry:
+   - "Leslie Ramano" → ["Leslie Ramano"]
+   - "Rafe Hoke" → ["Rafe Hoke"]
+   - Also include standalone first names that appear elsewhere alone
 
-5. Exclude only clearly non-person content:
-   - task labels (e.g. OSINT, Report Writing, Attempt Contact)
-   - locations
-   - organizations
-   - case metadata
+5. Exclude ONLY clearly non-person content:
+   - Task labels (OSINT, Report Writing, Attempt Contact, Travel, Interview, etc.)
+   - Locations, organizations, case metadata
+   - Generic role words on their own (Client, Attorney, Witness, Subject) — but DO include if paired with a real name
 
 6. Remove only exact duplicate strings.
 
 OUTPUT:
-Return ONLY a JSON array of extracted name strings.
+Return ONLY a JSON array of name strings, nothing else.
 
 INPUT:
 ${payload}`;
