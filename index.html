@@ -734,6 +734,29 @@
                 .trim();
         }
 
+        function cleanSpellCheckArtifacts() {
+            // Remove any accidental `50: "text"` or `"text"` wrappers applied by a previous spell check bug
+            const descSelectors = [
+                '#table-hours tbody tr:not(.case-header):not(.subtotal)',
+                '#table-mileage tbody tr:not(.case-header):not(.subtotal)',
+                '#table-expenses tbody tr:not(.case-header):not(.subtotal)'
+            ];
+            const descColIdx = { 'table-hours': 3, 'table-mileage': 2, 'table-expenses': 3 };
+            let cleaned = false;
+            descSelectors.forEach(sel => {
+                const tableId = sel.match(/#(table-\w+)/)[1];
+                const idx = descColIdx[tableId];
+                document.querySelectorAll(sel).forEach(tr => {
+                    const cell = tr.cells[idx];
+                    if (!cell) return;
+                    const orig = cell.textContent;
+                    const fixed = orig.replace(/^\d+:\s*"?(.*?)"?\s*$/, '$1').replace(/^"(.*)"$/, '$1').trim();
+                    if (fixed !== orig) { cell.textContent = fixed; cleaned = true; }
+                });
+            });
+            if (cleaned) saveInvoiceData();
+        }
+
         function normalizeCategoryText() {
             // Hours table: category is column index 2 (0=date, 1=case, 2=category)
             document.querySelectorAll('#table-hours tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
@@ -1567,7 +1590,7 @@ Rules:
             ind.textContent = '⏳ Spell checking…'; ind.classList.add('visible');
 
             const payload = cells.map((c, i) =>
-                `${i}|${c.table}|${c.date}|${c.caseNum}: "${c.text}"`
+                `[${i}] ${c.table} / ${c.date} / case ${c.caseNum} — ${c.text}`
             ).join('\n');
 
             const systemPrompt = `You are a spell checker for legal investigation invoices. Review the description lines and fix only genuine spelling errors.
@@ -1580,7 +1603,7 @@ Rules:
 - Flag the same word spelled differently across rows (e.g. "recieve" vs "receive")
 - Only return items where a clear misspelling exists
 
-Return ONLY a JSON array. Each object: {"idx":<row number>,"original":"<exact original>","suggestion":"<full line with only the misspelling corrected>","note":"<word that was fixed>"}
+Return ONLY a JSON array. Each object: {"idx":<row index from [N]>,"original":"<exact original description text>","suggestion":"<corrected description text only — no index, no case number, no quotes wrapper>","note":"<word that was fixed>"}
 If nothing needs fixing return: []`;
 
             try {
@@ -1657,7 +1680,10 @@ If nothing needs fixing return: []`;
                 const fixWrap = document.createElement('div');
                 fixWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px';
                 const fixInput = document.createElement('textarea');
-                fixInput.value = correction.suggestion;
+                // Strip any accidental payload-style prefix the AI may echo back (e.g. `50: "text"` or `"text"`)
+                let cleanSuggestion = correction.suggestion || '';
+                cleanSuggestion = cleanSuggestion.replace(/^\d+:\s*"?(.*?)"?\s*$/, '$1').replace(/^"(.*)"$/, '$1').trim();
+                fixInput.value = cleanSuggestion;
                 fixInput.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-family:inherit;resize:vertical;min-height:44px;box-sizing:border-box';
                 fixInput.placeholder = 'Edit correction here…';
                 fixWrap.appendChild(fixInput);
@@ -2072,6 +2098,7 @@ If nothing needs fixing return: []`;
 
             const savedData = localStorage.getItem('invoiceData');
             if (savedData) applyInvoiceState(JSON.parse(savedData));
+            cleanSpellCheckArtifacts();
         }
 
         // Name conversion via AI — extracts names from service hours and assigns labels
