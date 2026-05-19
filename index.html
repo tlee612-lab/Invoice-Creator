@@ -2139,14 +2139,6 @@ If nothing to fix: []`;
                     rows.push({ desc, case: caseNum, element: cells[3] });
                 }
             });
-            document.querySelectorAll('#table-expenses tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
-                const cells = tr.querySelectorAll('td');
-                if (cells.length >= 4) {
-                    const desc = cells[3].textContent.trim();
-                    const caseNum = cells[1]?.textContent.trim() || 'Unknown';
-                    rows.push({ desc, case: caseNum, element: cells[3] });
-                }
-            });
 
             if (rows.length === 0) {
                 const ind = document.getElementById('save-indicator');
