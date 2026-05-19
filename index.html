@@ -1591,18 +1591,18 @@ If nothing needs fixing return: []`;
             try {
                 const result = await callAI(systemPrompt, payload);
                 let corrections = [];
-                // Extract the first array-of-objects ([{...}]) from the response.
-                // Start search from '[{' so lone index markers like [0] or [1]
-                // in the AI's text are not mistaken for the corrections array.
-                // Falls back to '[]' (empty array) if the AI signals no issues.
-                const cleaned = result.replace(/```[a-z]*/gi, '').replace(/```/g, '');
+                // Strip markdown fences, then find the first [ that starts a
+                // JSON array (object array OR empty). Use a balanced-bracket
+                // walker so trailing text after ] doesn't get included.
+                const cleaned = result.replace(/```[a-z]*/gi, '').replace(/```/g, '').trim();
                 const arrayStr = (function extractArray(s) {
-                    // Prefer array-of-objects; also accept bare []
-                    const objStart = s.indexOf('[{');
-                    const emptyArr = s.indexOf('[]');
-                    const start = objStart !== -1 ? objStart : (emptyArr !== -1 ? emptyArr : -1);
+                    const start = s.indexOf('[');
                     if (start === -1) return null;
-                    if (s[start + 1] === ']') return '[]'; // bare []
+                    // Skip lone index markers like [0] [1] — must be [ ] or [{
+                    // Allow whitespace: [ { or [\n{
+                    const after = s.slice(start + 1).trimStart();
+                    if (after[0] !== '{' && after[0] !== ']') return extractArray(s.slice(start + 1)); // skip, keep searching
+                    if (after[0] === ']') return '[]'; // empty array
                     let depth = 0;
                     for (let i = start; i < s.length; i++) {
                         if (s[i] === '[') depth++;
@@ -1613,6 +1613,7 @@ If nothing needs fixing return: []`;
                 if (arrayStr) {
                     try {
                         corrections = JSON.parse(arrayStr);
+                        if (!Array.isArray(corrections)) corrections = [];
                     } catch (parseErr) {
                         throw new Error(`JSON parse failed (${parseErr.message}) — raw: ${arrayStr.slice(0, 120)}`);
                     }
@@ -1621,10 +1622,8 @@ If nothing needs fixing return: []`;
                 ind.classList.remove('visible');
 
                 if (corrections.length === 0) {
-                    // Show first 200 chars of AI response to help diagnose false negatives
-                    const preview = result.replace(/\n/g, ' ').slice(0, 200);
-                    ind.textContent = `✓ No issues found — AI said: ${preview}`; ind.classList.add('visible');
-                    setTimeout(() => ind.classList.remove('visible'), 12000);
+                    ind.textContent = '✓ No spelling issues found'; ind.classList.add('visible');
+                    setTimeout(() => ind.classList.remove('visible'), 3000);
                     return;
                 }
                 _showSpellCheckModal(corrections, cells);
