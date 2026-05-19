@@ -1621,6 +1621,7 @@ If nothing to fix: []`;
                     }
                     return null;
                 })(cleaned);
+                console.log('[SpellCheck] arrayStr extracted:', arrayStr);
                 if (arrayStr) {
                     try {
                         corrections = JSON.parse(arrayStr);
@@ -1629,6 +1630,7 @@ If nothing to fix: []`;
                         throw new Error(`JSON parse failed (${parseErr.message}) — raw: ${arrayStr.slice(0, 120)}`);
                     }
                 }
+                console.log('[SpellCheck] corrections parsed:', JSON.stringify(corrections));
 
                 ind.classList.remove('visible');
 
