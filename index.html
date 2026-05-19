@@ -2812,71 +2812,67 @@ ${payload}`;
             ind.textContent = '⏳ Generating PDF…';
             ind.classList.add('visible');
 
-            // Clone invoice and apply print-friendly styles to the clone only
-            const clone = invoiceEl.cloneNode(true);
-            applyPrintStyles(clone);
+            // Put offscreen container in the document FIRST so CSS class styles resolve
+            const offscreen = document.createElement('div');
+            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;background:#fff';
+            document.body.appendChild(offscreen);
 
-            // Remove screen-only elements from the clone
+            // Clone into live document so getComputedStyle works correctly
+            const clone = invoiceEl.cloneNode(true);
+            offscreen.appendChild(clone);
+
+            // Remove screen-only elements
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
 
-            // Tighten container padding for PDF (screen uses 40px which is too loose)
-            clone.style.padding = '20px 30px';
-            clone.style.boxShadow = 'none';
-            clone.style.overflowX = 'hidden';
+            // Container: tighten padding, remove shadow
+            clone.style.padding    = '20px 28px';
+            clone.style.boxShadow  = 'none';
+            clone.style.maxWidth   = '100%';
+            clone.style.boxSizing  = 'border-box';
+            clone.style.overflow   = 'hidden';
 
-            // Constrain all tables to 100% width.
-            // table-layout:fixed honours explicit th widths; overflow:hidden clips cell content
-            // so html2canvas does not measure white-space:nowrap overflow as extra page width.
-            // NOTE: do NOT set max-width on cells — it overrides the th percentage widths.
+            // Tables: fixed layout so th widths control columns; clip cell overflow
             clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
-                t.style.width = '100%';
-                t.style.maxWidth = '100%';
+                t.style.width       = '100%';
+                t.style.maxWidth    = '100%';
+                t.style.boxSizing   = 'border-box';
             });
+            // Cells: clip content; tighten padding (computed styles now valid since clone is in DOM)
             clone.querySelectorAll('td, th').forEach(cell => {
-                cell.style.overflow = 'hidden';
-                cell.style.textOverflow = 'ellipsis';
-                // Tighten row padding for PDF output
+                cell.style.overflow      = 'hidden';
+                cell.style.textOverflow  = 'ellipsis';
+                cell.style.boxSizing     = 'border-box';
                 const cs = window.getComputedStyle(cell);
-                const pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom);
-                if (pt > 4) cell.style.paddingTop    = Math.max(3, pt  - 2) + 'px';
-                if (pb > 4) cell.style.paddingBottom = Math.max(3, pb  - 2) + 'px';
+                const pt = parseFloat(cs.paddingTop)    || 0;
+                const pb = parseFloat(cs.paddingBottom) || 0;
+                cell.style.paddingTop    = Math.max(2, pt - 3) + 'px';
+                cell.style.paddingBottom = Math.max(2, pb - 3) + 'px';
             });
 
-            // After removing print-hide columns, fix colspans in tfoot/subtotal rows
+            // Fix colspans in subtotal/footer rows after print-hide columns removed
             clone.querySelectorAll('table').forEach(table => {
                 const totalCols = table.querySelectorAll('thead tr:first-child th').length;
                 table.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
                     const cells = Array.from(tr.cells);
                     if (cells.length < 2) return;
-                    // First cell spans everything except the last value cell
                     cells[0].colSpan = totalCols - (cells.length - 1);
                 });
             });
 
-            // Add page-break hints so tables don't split rows awkwardly
-            clone.querySelectorAll('tr').forEach(tr => {
-                tr.style.setProperty('page-break-inside', 'avoid', 'important');
-                tr.style.setProperty('break-inside', 'avoid', 'important');
-            });
-            clone.querySelectorAll('.subtotal, .case-header').forEach(el => {
+            // Page-break hints
+            clone.querySelectorAll('tr, .subtotal, .case-header').forEach(el => {
                 el.style.setProperty('page-break-inside', 'avoid', 'important');
-                el.style.setProperty('break-inside', 'avoid', 'important');
+                el.style.setProperty('break-inside',      'avoid', 'important');
             });
-            clone.querySelectorAll('.section-heading, .invoice-section > h2, .invoice-section > h3').forEach(el => {
+            clone.querySelectorAll('.section-heading').forEach(el => {
                 el.style.setProperty('page-break-after', 'avoid', 'important');
-                el.style.setProperty('break-after', 'avoid', 'important');
+                el.style.setProperty('break-after',      'avoid', 'important');
             });
             clone.querySelectorAll('.invoice-totals-table, .invoice-totals-table tr').forEach(el => {
                 el.style.setProperty('page-break-inside', 'avoid', 'important');
-                el.style.setProperty('break-inside', 'avoid', 'important');
+                el.style.setProperty('break-inside',      'avoid', 'important');
             });
-
-            // Place clone in an off-screen container for rendering (never shown to user)
-            const offscreen = document.createElement('div');
-            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;background:#fff';
-            offscreen.appendChild(clone);
-            document.body.appendChild(offscreen);
 
             // html2canvas cannot resolve CSS custom properties — set variables then
             // immediately inline all computed colors so html2canvas sees plain RGB values
