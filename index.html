@@ -2776,6 +2776,8 @@ ${payload}`;
             clone.querySelectorAll('td, th').forEach(cell => {
                 cell.style.overflow = 'hidden';
                 cell.style.maxWidth = '0'; // forces table-layout:fixed to honour column widths
+                cell.style.textOverflow = 'ellipsis';
+                cell.style.whiteSpace = 'nowrap';
             });
 
             // After removing print-hide columns, fix colspans in tfoot/subtotal rows
