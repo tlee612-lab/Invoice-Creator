@@ -734,28 +734,6 @@
                 .trim();
         }
 
-        function cleanSpellCheckArtifacts() {
-            // Remove any accidental `50: "text"` or `"text"` wrappers applied by a previous spell check bug
-            const descSelectors = [
-                '#table-hours tbody tr:not(.case-header):not(.subtotal)',
-                '#table-mileage tbody tr:not(.case-header):not(.subtotal)',
-                '#table-expenses tbody tr:not(.case-header):not(.subtotal)'
-            ];
-            const descColIdx = { 'table-hours': 3, 'table-mileage': 2, 'table-expenses': 3 };
-            let cleaned = false;
-            descSelectors.forEach(sel => {
-                const tableId = sel.match(/#(table-\w+)/)[1];
-                const idx = descColIdx[tableId];
-                document.querySelectorAll(sel).forEach(tr => {
-                    const cell = tr.cells[idx];
-                    if (!cell) return;
-                    const orig = cell.textContent;
-                    const fixed = orig.replace(/^\d+:\s*"?(.*?)"?\s*$/, '$1').replace(/^"(.*)"$/, '$1').trim();
-                    if (fixed !== orig) { cell.textContent = fixed; cleaned = true; }
-                });
-            });
-            if (cleaned) saveInvoiceData();
-        }
 
         function normalizeCategoryText() {
             // Hours table: category is column index 2 (0=date, 1=case, 2=category)
@@ -792,10 +770,13 @@
             rows.forEach(tr => tbody.insertBefore(tr, firstSubtotal || null));
         }
 
-        function updateInvoiceTotals() {
+        function sortAllTables() {
             sortTableByDate('table-hours');
             sortTableByDate('table-mileage');
             sortTableByDate('table-expenses');
+        }
+
+        function updateInvoiceTotals() {
             normalizeCategoryText();
             let totalExpenses = 0;
             let allServiceDates = [];
@@ -2098,7 +2079,7 @@ If nothing needs fixing return: []`;
 
             const savedData = localStorage.getItem('invoiceData');
             if (savedData) applyInvoiceState(JSON.parse(savedData));
-            cleanSpellCheckArtifacts();
+            sortAllTables();
         }
 
         // Name conversion via AI — extracts names from service hours and assigns labels
@@ -3180,9 +3161,10 @@ ${payload}`;
             }
 
             if (importCount > 0) {
+                sortAllTables();
                 updateInvoiceTotals();
                 saveInvoiceData();
-                document.getElementById('paste-area').value = ''; 
+                document.getElementById('paste-area').value = '';
                 const indicator = document.getElementById('save-indicator');
                 indicator.textContent = `✔ Imported ${importCount} items`;
                 indicator.classList.add('visible');
