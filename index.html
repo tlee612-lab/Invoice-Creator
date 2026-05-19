@@ -178,6 +178,7 @@
         #table-hours tr.case-header, #table-mileage tr.case-header, #table-expenses tr.case-header { display: none !important; }
         #table-hours tbody tr.subtotal, #table-mileage tbody tr.subtotal, #table-expenses tbody tr.subtotal { display: none !important; }
         .case-col { width: 30px; min-width: 30px; max-width: 30px; text-align: center; font-size: 11px; color: var(--muted, #888); font-weight: normal; }
+        .running-col { width: 60px; text-align: right; font-size: 11px; color: var(--muted, #888); font-style: italic; }
         @media print { .print-hide { display: none !important; } }
         table tr.grand-total td { background: var(--surface2); color: var(--text); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
@@ -476,7 +477,7 @@
         <h2 class="section-heading">SERVICE HOURS</h2>
         <table id="table-hours">
             <thead>
-                <tr><th style="width: 80px;">Date</th><th class="case-col print-hide">Case</th><th style="width: 120px;">Category</th><th>Description</th><th class="hours-col">Hours</th></tr>
+                <tr><th style="width: 80px;">Date</th><th class="case-col print-hide">Case</th><th style="width: 120px;">Category</th><th>Description</th><th class="running-col print-hide">Running</th><th class="hours-col">Hours</th></tr>
             </thead>
             <tbody>
                 <!-- Case data will be dynamically inserted here -->
@@ -793,7 +794,7 @@
                 let currentRow = caseHeader.nextElementSibling;
                 while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
                     const dateCell = currentRow.cells[0] ? currentRow.cells[0].textContent.trim() : '';
-                    const hoursCell = currentRow.cells[4] ? currentRow.cells[4].textContent.replace(/[^\d.-]/g, '') : '0';
+                    const hoursCell = currentRow.cells[5] ? currentRow.cells[5].textContent.replace(/[^\d.-]/g, '') : '0';
                     const hours = parseFloat(hoursCell) || 0;
                     if (dateCell && hours > 0) {
                         const date = parseLocalDate(dateCell);
@@ -839,6 +840,15 @@
                 hoursMerged.cells[0].innerHTML = (hourParts.length ? hourParts.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : '') + 'Subtotal:';
                 hoursMerged.cells[1].textContent = totalHoursAll.toFixed(1);
             }
+            // Update running total column (screen-only, hidden on print)
+            let runningTotal = 0;
+            serviceTable.querySelectorAll('tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
+                const hrs = parseFloat(tr.cells[5]?.textContent.replace(/[^\d.-]/g, '') || '0') || 0;
+                runningTotal += hrs;
+                const runCell = tr.cells[4];
+                if (runCell) runCell.textContent = runningTotal.toFixed(1);
+            });
+
             const totalHours55 = hoursByRate.get(55) || 0; // legacy compat for auth-hours check
             const totalHours59 = hoursByRate.get(59) || 0;
 
@@ -1221,18 +1231,19 @@
 
             Object.entries(tableMap).forEach(([tableId, key]) => {
                 const tableBody = document.getElementById(tableId).querySelector('tbody');
-                const caseHeaders = tableBody.querySelectorAll('.case-header');
-                caseHeaders.forEach(caseHeader => {
-                    const caseNumber = caseHeader.dataset.caseId;
-                    const caseData = { caseNumber: caseNumber, rows: [] };
-                    let currentRow = caseHeader.nextElementSibling;
-                    while (currentRow && !currentRow.classList.contains('case-header') && !currentRow.classList.contains('subtotal')) {
-                        const rowCells = Array.from(currentRow.cells).map(cell => cell.textContent);
-                        caseData.rows.push({ cells: rowCells, cls: currentRow.className || '' });
-                        currentRow = currentRow.nextElementSibling;
+                // Use data-case-id on each row — not adjacency traversal — so sort order doesn't break save
+                const caseGroups = new Map(); // caseId -> { caseNumber, rows[] }
+                const caseOrder = [];
+                tableBody.querySelectorAll('tr:not(.case-header):not(.subtotal)').forEach(tr => {
+                    const caseId = tr.dataset.caseId || '';
+                    if (!caseGroups.has(caseId)) {
+                        caseGroups.set(caseId, { caseNumber: caseId, rows: [] });
+                        caseOrder.push(caseId);
                     }
-                    state.tables[key].push(caseData);
+                    const rowCells = Array.from(tr.cells).map(cell => cell.textContent);
+                    caseGroups.get(caseId).rows.push({ cells: rowCells, cls: tr.className || '' });
                 });
+                state.tables[key] = caseOrder.map(id => caseGroups.get(id));
             });
             return state;
         }
@@ -1431,7 +1442,7 @@
                 const hoursByRate = new Map();
                 document.querySelectorAll('#table-hours tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
                     const dateCell = tr.cells[0]?.textContent.trim();
-                    const hrsCell  = tr.cells[4]?.textContent.trim();
+                    const hrsCell  = tr.cells[5]?.textContent.trim();
                     const hrs = parseFloat(hrsCell) || 0;
                     if (!dateCell || hrs <= 0) return;
                     const rate = getRateForDate(CONFIG.RATE_SCHEDULES.hourly, dateCell);
@@ -1715,7 +1726,7 @@ If nothing needs fixing return: []`;
 
             if (invoiceState.tables) {
                 const configs = {
-                    hours:    { id: 'table-hours',    cols: 5, class: 'hours-col',  colIdx: 4, oldCols: 4 },
+                    hours:    { id: 'table-hours',    cols: 6, class: 'hours-col',  colIdx: 5, oldCols: 4, midCols: 5 },
                     mileage:  { id: 'table-mileage',  cols: 4, class: 'miles-col',  colIdx: 3, oldCols: 3 },
                     expenses: { id: 'table-expenses', cols: 6, class: 'amount-col', colIdx: 5, oldCols: 5 }
                 };
@@ -1732,20 +1743,26 @@ If nothing needs fixing return: []`;
                             let cells = Array.isArray(rowData) ? rowData : (rowData.cells || []);
                             const cls = Array.isArray(rowData) ? '' : (rowData.cls || '');
                             if (cls) tr.className = cls;
-                            // Backward compat: old saves lack the case column — inject it
-                            const isOldFormat = cells.length === cfg.oldCols;
-                            if (isOldFormat) {
-                                const caseShort = (caseGroup.caseNumber || '').slice(-2);
+                            // Backward compat: inject missing columns for older save formats
+                            const caseShort = (caseGroup.caseNumber || '').slice(-2);
+                            if (cells.length === cfg.oldCols) {
+                                // Very old: no case col, no running col — inject both
                                 cells = [cells[0], caseShort, ...cells.slice(1)];
+                            }
+                            if (cfg.midCols && cells.length === cfg.midCols) {
+                                // Mid format: has case col but no running col — inject running col before last
+                                cells = [...cells.slice(0, cells.length - 1), '—', cells[cells.length - 1]];
                             }
                             cells.forEach((cellText, idx) => {
                                 const td = document.createElement('td');
                                 td.textContent = cellText;
-                                td.contentEditable = 'true';
-                                if (idx === 1) td.className = 'case-col print-hide';
-                                else if (idx === cfg.colIdx) td.className = cfg.class;
+                                if (idx === 1) { td.className = 'case-col print-hide'; td.contentEditable = 'true'; }
+                                else if (cfg.midCols && idx === cells.length - 2) { td.className = 'running-col print-hide'; }
+                                else if (idx === cfg.colIdx) { td.className = cfg.class; td.contentEditable = 'true'; }
+                                else { td.contentEditable = 'true'; }
                                 tr.appendChild(td);
                             });
+                            tr.dataset.caseId = caseGroup.caseNumber || '';
                             subtotalRow.insertAdjacentElement('beforebegin', tr);
                         });
                     });
@@ -2792,6 +2809,17 @@ ${payload}`;
             offscreen.appendChild(clone);
             document.body.appendChild(offscreen);
 
+            // html2canvas cannot resolve CSS custom properties — override them with explicit
+            // light-theme values so the PDF renders with proper colors instead of B&W
+            clone.style.setProperty('--bg',       '#ffffff');
+            clone.style.setProperty('--surface',  '#f4f6fa');
+            clone.style.setProperty('--surface2', '#e8ecf4');
+            clone.style.setProperty('--border',   '#0066cc');
+            clone.style.setProperty('--text',     '#111111');
+            clone.style.setProperty('--accent',   '#00aa88');
+            clone.style.setProperty('--accent2',  '#0066cc');
+            clone.style.setProperty('--muted',    '#555555');
+
             try {
                 // Generate PDF as a blob so we can use the save-file picker
                 const pdfBlob = await html2pdf().set({
@@ -3047,7 +3075,7 @@ ${payload}`;
                          }
 
                          const caseShortH = caseNumber.slice(-2);
-                         subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClass}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortH}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
+                         subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClass}" data-case-id="${caseNumber}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortH}</td><td contenteditable="true">${cleanedCategory}</td><td contenteditable="true">${description}</td><td class="running-col print-hide">—</td><td class="hours-col" contenteditable="true">${displayHours.toFixed(1)}</td></tr>`);
                          importCount++;
                      }
                      if (miles > 0) {
@@ -3064,7 +3092,7 @@ ${payload}`;
                          }
 
                          const caseShortM = caseNumber.slice(-2);
-                         subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClassMileage}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortM}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
+                         subtotalRow.insertAdjacentHTML('beforebegin', `<tr class="${rateClassMileage}" data-case-id="${caseNumber}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortM}</td><td contenteditable="true">${route}</td><td class="miles-col" contenteditable="true">${miles.toFixed(1)}</td></tr>`);
                          importCount++;
                       }
                      if (type === 'expenses' || (qty > 0 && hours === 0 && miles === 0)) {
@@ -3079,7 +3107,7 @@ ${payload}`;
                         }
 
                         const caseShortE = caseNumber.slice(-2);
-                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortE}</td><td contenteditable="true">${category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim()}</td><td contenteditable="true">${description}</td><td contenteditable="true">${qty}</td><td class="amount-col" contenteditable="true">$${amount.toFixed(2)}</td></tr>`);
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr data-case-id="${caseNumber}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortE}</td><td contenteditable="true">${category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim()}</td><td contenteditable="true">${description}</td><td contenteditable="true">${qty}</td><td class="amount-col" contenteditable="true">$${amount.toFixed(2)}</td></tr>`);
                         importCount++;
                     }
                 } else {
@@ -3106,7 +3134,7 @@ ${payload}`;
                              }
                          }
                          
-                         rowHtml = `<tr class="${rateClass}"><td contenteditable="true">${dateVal}</td><td contenteditable="true" class="case-col print-hide">${caseNumber.slice(-2)}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedDesc}</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
+                         rowHtml = `<tr class="${rateClass}" data-case-id="${caseNumber}"><td contenteditable="true">${dateVal}</td><td contenteditable="true" class="case-col print-hide">${caseNumber.slice(-2)}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cleanedDesc}</td><td class="running-col print-hide">—</td><td class="hours-col" contenteditable="true">${cols[4]}</td></tr>`;
                          colSpanData = 5;
                          importCount++;
                       } else if (cols.length === 4) { // Mileage: [Case, Date, Route, Miles]
@@ -3118,13 +3146,13 @@ ${payload}`;
                                   rateClassMileage = 'rate-55';
                               }
                           }
-                          rowHtml = `<tr class="${rateClassMileage}"><td contenteditable="true">${cols[1]}</td><td contenteditable="true" class="case-col print-hide">${caseNumber.slice(-2)}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
+                          rowHtml = `<tr class="${rateClassMileage}" data-case-id="${caseNumber}"><td contenteditable="true">${cols[1]}</td><td contenteditable="true" class="case-col print-hide">${caseNumber.slice(-2)}</td><td contenteditable="true">${cols[2]}</td><td class="miles-col" contenteditable="true">${cols[3]}</td></tr>`;
                           colSpanData = 4;
                           importCount++;
                       } else if (cols.length === 6) { // Expenses: [Case, Date, Category, Description, Qty, Amount]
                          targetTableId = 'table-expenses';
                          const amt = cols[5] || '$0.00';
-                         rowHtml = `<tr><td contenteditable="true">${cols[1]}</td><td contenteditable="true" class="case-col print-hide">${caseNumber.slice(-2)}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
+                         rowHtml = `<tr data-case-id="${caseNumber}"><td contenteditable="true">${cols[1]}</td><td contenteditable="true" class="case-col print-hide">${caseNumber.slice(-2)}</td><td contenteditable="true">${cols[2]}</td><td contenteditable="true">${cols[3]}</td><td contenteditable="true">${cols[4]}</td><td class="amount-col" contenteditable="true">${amt}</td></tr>`;
                          colSpanData = 6;
                          importCount++;
                       }
@@ -3344,7 +3372,7 @@ ${payload}`;
         function _buildBlankRow(tableId) {
             const tr = document.createElement('tr');
             if (tableId === 'table-hours') {
-                tr.innerHTML = `<td contenteditable="true"></td><td contenteditable="true" class="case-col print-hide"></td><td contenteditable="true"></td><td contenteditable="true"></td><td class="hours-col" contenteditable="true">0.0</td>`;
+                tr.innerHTML = `<td contenteditable="true"></td><td contenteditable="true" class="case-col print-hide"></td><td contenteditable="true"></td><td contenteditable="true"></td><td class="running-col print-hide">—</td><td class="hours-col" contenteditable="true">0.0</td>`;
             } else if (tableId === 'table-mileage') {
                 tr.innerHTML = `<td contenteditable="true"></td><td contenteditable="true" class="case-col print-hide"></td><td contenteditable="true"></td><td class="miles-col" contenteditable="true">0.0</td>`;
             } else if (tableId === 'table-expenses') {
