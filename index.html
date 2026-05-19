@@ -2838,10 +2838,17 @@ ${payload}`;
                 t.style.maxWidth    = '100%';
                 t.style.boxSizing   = 'border-box';
             });
+            // Invoice totals table: use auto layout so description text isn't clipped
+            const cloneTotals = clone.querySelector('.invoice-totals-table');
+            if (cloneTotals) {
+                cloneTotals.style.tableLayout = 'auto';
+            }
             // Cells: clip content; tighten padding (computed styles now valid since clone is in DOM)
             clone.querySelectorAll('td, th').forEach(cell => {
-                cell.style.overflow      = 'hidden';
-                cell.style.textOverflow  = 'ellipsis';
+                const inTotals = cell.closest('.invoice-totals-table');
+                cell.style.overflow      = inTotals ? 'visible' : 'hidden';
+                cell.style.textOverflow  = inTotals ? 'clip'    : 'ellipsis';
+                cell.style.whiteSpace    = inTotals ? 'nowrap'  : '';
                 cell.style.boxSizing     = 'border-box';
                 const cs = window.getComputedStyle(cell);
                 const pt = parseFloat(cs.paddingTop)    || 0;
@@ -2892,7 +2899,7 @@ ${payload}`;
                 const btop  = cs.borderTopColor;
                 const bbot  = cs.borderBottomColor;
                 if (color) el.style.color = color;
-                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') el.style.backgroundColor = bg;
+                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && bg !== 'rgb(0, 0, 0)') el.style.backgroundColor = bg;
                 if (btop) el.style.borderTopColor = btop;
                 if (bbot) el.style.borderBottomColor = bbot;
                 Array.from(el.children).forEach(inlineColors);
