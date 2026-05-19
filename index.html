@@ -1574,18 +1574,28 @@ Rules:
                 `Row ${i}: ${c.text}`
             ).join('\n');
 
-            const systemPrompt = `You are a spell checker for legal investigation invoices. Review each description line and fix genuine spelling errors.
+            const systemPrompt = `You are a spell checker for legal investigation invoice descriptions.
 
-Rules:
-- Fix ONLY clearly misspelled common English words — leave everything else exactly as-is
-- Do NOT change: people's names (first or last), place names, road names, abbreviations, acronyms (OSINT, PAE, etc.), case numbers, legal/investigative terms
-- If a word could be a person's name or proper noun, leave it alone
-- DO flag: common words that are clearly misspelled (e.g. "surveilance" → "surveillance", "recieved" → "received")
-- Flag the same word spelled differently across rows
-- Return every line that has a misspelling — do not skip
+Your job: find misspelled common English words. Be decisive — if a common word is clearly wrong, flag it.
 
-Return ONLY a JSON array. Each object: {"idx":<Row number>,"original":"<exact original text>","suggestion":"<full corrected line>","note":"<word fixed>"}
-If nothing needs fixing return: []`;
+ALWAYS SKIP (never flag, never change):
+- People's names, last names, street/place names
+- Abbreviations and ALL-CAPS acronyms (OSINT, PAE, TLI, DOB, MVA, etc.)
+- Case numbers, codes, ID numbers
+- Hyphenated compound terms used in investigations
+
+ALWAYS FLAG — these are common English words, never proper names:
+- Verbs: "conducted", "surveillance", "received", "interviewed", "observed", "travelled", "obtained"
+- Nouns: "vehicle", "address", "residence", "subject", "witness", "evidence", "location"
+- Any word a spellchecker would flag in a standard document
+
+Examples of what to catch: "surveilance"→"surveillance", "recieved"→"received", "vehical"→"vehicle", "witnes"→"witness", "occured"→"occurred", "seperately"→"separately"
+
+Flag the same word spelled two different ways across rows.
+
+Return ONLY a raw JSON array — no explanation, no markdown:
+[{"idx":<Row number>,"original":"<exact original text>","suggestion":"<full corrected line>","note":"<word fixed>"}]
+If nothing to fix: []`;
 
             try {
                 const result = await callAI(systemPrompt, payload);
@@ -1621,9 +1631,8 @@ If nothing needs fixing return: []`;
                 ind.classList.remove('visible');
 
                 if (corrections.length === 0) {
-                    const preview = cleaned.slice(0, 300).replace(/\n/g, ' ');
-                    ind.textContent = `✓ No issues — raw: ${preview}`; ind.classList.add('visible');
-                    setTimeout(() => ind.classList.remove('visible'), 15000);
+                    ind.textContent = `✓ Spell check complete — no issues found`; ind.classList.add('visible');
+                    setTimeout(() => ind.classList.remove('visible'), 4000);
                     return;
                 }
                 _showSpellCheckModal(corrections, cells);
@@ -2439,16 +2448,11 @@ ${payload}`;
                     numInput.value = item.customNum || '';
                     numInput.placeholder = 'auto';
                     numInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
-                    numInput.addEventListener('input', function() {
-                        const i = parseInt(row.dataset.idx);
-                        assignments[i].customNum = parseInt(this.value) || null;
-                        updatePreview();
-                    });
 
                     row.append(checkbox, nameDiv, labelCell, numInput);
                     listEl.appendChild(row);
                     rowElements.push({ row, checkbox, select, customLabelInput, numInput, idx });
-                    
+
                     checkbox.addEventListener('change', function() {
                         const i = parseInt(this.dataset.idx);
                         if (this.checked) selectedIndices.add(i);
@@ -2465,7 +2469,7 @@ ${payload}`;
                         updatePreview();
                     });
                     numInput.addEventListener('input', function() {
-                        const i = parseInt(this.dataset.idx);
+                        const i = parseInt(row.dataset.idx);
                         const val = parseInt(this.value);
                         assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
                         refreshSelectLabel(select, assignments[i]);
@@ -2594,6 +2598,15 @@ ${payload}`;
                         return;
                     }
                     
+                    // Flush current DOM values → assignments before splicing (guards against any un-fired input events)
+                    rowElements.forEach(({ idx: rIdx, numInput: rNum, select: rSel, customLabelInput: rCL }) => {
+                        if (!assignments[rIdx]) return;
+                        const v = parseInt(rNum.value);
+                        assignments[rIdx].customNum = isNaN(v) || v < 1 ? null : v;
+                        assignments[rIdx].label = rSel.value;
+                        assignments[rIdx].customLabel = rSel.value === 'custom' ? (rCL?.value.trim() || '') : null;
+                    });
+
                     // Collect cases from selected rows; log merged-away names
                     const newCases = new Set();
                     const spliceOrder = Array.from(selectedIndices).sort((a,b) => b - a); // descending for safe splice
@@ -2808,10 +2821,15 @@ ${payload}`;
             // Remove screen-only elements from the clone
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
 
-            // Constrain all tables to 100% width so nothing overflows the page.
-            // overflow:hidden on every cell stops html2canvas from measuring
-            // visual text-overflow (white-space:nowrap) as extra page width.
+            // Tighten container padding for PDF (screen uses 40px which is too loose)
+            clone.style.padding = '20px 30px';
+            clone.style.boxShadow = 'none';
             clone.style.overflowX = 'hidden';
+
+            // Constrain all tables to 100% width.
+            // table-layout:fixed honours explicit th widths; overflow:hidden clips cell content
+            // so html2canvas does not measure white-space:nowrap overflow as extra page width.
+            // NOTE: do NOT set max-width on cells — it overrides the th percentage widths.
             clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
                 t.style.width = '100%';
@@ -2819,9 +2837,12 @@ ${payload}`;
             });
             clone.querySelectorAll('td, th').forEach(cell => {
                 cell.style.overflow = 'hidden';
-                cell.style.maxWidth = '0'; // forces table-layout:fixed to honour column widths
                 cell.style.textOverflow = 'ellipsis';
-                cell.style.whiteSpace = 'nowrap';
+                // Tighten row padding for PDF output
+                const cs = window.getComputedStyle(cell);
+                const pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom);
+                if (pt > 4) cell.style.paddingTop    = Math.max(3, pt  - 2) + 'px';
+                if (pb > 4) cell.style.paddingBottom = Math.max(3, pb  - 2) + 'px';
             });
 
             // After removing print-hide columns, fix colspans in tfoot/subtotal rows
@@ -2894,38 +2915,63 @@ ${payload}`;
                     pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
                 }).from(clone).output('blob');
 
-                // Try File System Access API — lets user choose save location
-                if (window.showSaveFilePicker) {
-                    try {
-                        const handle = await window.showSaveFilePicker({
-                            suggestedName: filename,
-                            types: [{ description: 'PDF file', accept: { 'application/pdf': ['.pdf'] } }],
-                        });
-                        const writable = await handle.createWritable();
-                        await writable.write(pdfBlob);
-                        await writable.close();
-                    } catch (err) {
-                        if (err.name === 'AbortError') {
-                            // User cancelled — clear toast and bail
-                            ind.textContent = origText;
-                            ind.classList.remove('visible');
-                            return;
-                        }
-                        // Picker unavailable — fall through to standard download
-                        console.warn('showSaveFilePicker failed, using fallback:', err);
-                        _pdfFallbackDownload(pdfBlob, filename);
-                    }
-                } else {
-                    // Fallback for Firefox / file:// / older browsers
-                    _pdfFallbackDownload(pdfBlob, filename);
-                }
+                // ── PDF Preview modal ─────────────────────────────────────────
+                ind.textContent = '👁 Preview ready';
+                const blobUrl = URL.createObjectURL(pdfBlob);
 
-                ind.textContent = '✔ PDF saved';
-                clearTimeout(ind._pdfTimeout);
-                ind._pdfTimeout = setTimeout(() => {
-                    ind.textContent = origText;
-                    ind.classList.remove('visible');
-                }, 3000);
+                const pvOverlay = document.createElement('div');
+                pvOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;box-sizing:border-box';
+
+                const pvToolbar = document.createElement('div');
+                pvToolbar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;width:100%;max-width:900px';
+                pvToolbar.innerHTML = `
+                    <span style="flex:1;font-family:var(--ui);font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase">📄 PDF Preview — ${filename}</span>
+                    <button id="pvSaveBtn" style="padding:8px 18px;border-radius:6px;border:2px solid var(--accent);background:var(--accent);color:#fff;font-family:var(--ui);font-weight:700;font-size:13px;cursor:pointer">💾 Save</button>
+                    <button id="pvCloseBtn" style="padding:8px 14px;border-radius:6px;border:1px solid #888;background:rgba(255,255,255,0.1);color:#fff;font-family:var(--ui);font-weight:700;font-size:13px;cursor:pointer">✕ Close</button>
+                `;
+
+                const pvFrame = document.createElement('iframe');
+                pvFrame.src = blobUrl;
+                pvFrame.style.cssText = 'width:100%;max-width:900px;flex:1;border:none;border-radius:6px;background:#fff;min-height:0';
+
+                pvOverlay.append(pvToolbar, pvFrame);
+                document.body.appendChild(pvOverlay);
+
+                await new Promise(resolve => {
+                    const cleanup = () => { URL.revokeObjectURL(blobUrl); pvOverlay.remove(); resolve(); };
+
+                    pvOverlay.querySelector('#pvCloseBtn').onclick = () => {
+                        ind.textContent = origText;
+                        ind.classList.remove('visible');
+                        cleanup();
+                    };
+
+                    pvOverlay.querySelector('#pvSaveBtn').onclick = async () => {
+                        cleanup();
+                        // Try File System Access API — lets user choose save location
+                        if (window.showSaveFilePicker) {
+                            try {
+                                const handle = await window.showSaveFilePicker({
+                                    suggestedName: filename,
+                                    types: [{ description: 'PDF file', accept: { 'application/pdf': ['.pdf'] } }],
+                                });
+                                const writable = await handle.createWritable();
+                                await writable.write(pdfBlob);
+                                await writable.close();
+                            } catch (err) {
+                                if (err.name !== 'AbortError') {
+                                    _pdfFallbackDownload(pdfBlob, filename);
+                                }
+                            }
+                        } else {
+                            _pdfFallbackDownload(pdfBlob, filename);
+                        }
+                        ind.textContent = '✔ PDF saved';
+                        clearTimeout(ind._pdfTimeout);
+                        ind._pdfTimeout = setTimeout(() => { ind.textContent = origText; ind.classList.remove('visible'); }, 3000);
+                        resolve();
+                    };
+                });
             } catch (err) {
                 console.error('PDF generation failed:', err);
                 ind.textContent = '⚠ PDF failed — see console';
