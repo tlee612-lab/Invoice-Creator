@@ -2461,27 +2461,17 @@ ${payload}`;
                         assignments[i].label = this.value;
                         customLabelInput.style.display = this.value === 'custom' ? 'block' : 'none';
                         if (this.value !== 'custom') assignments[i].customLabel = null;
-                        // Auto-fill the number input with the next sequential number for this label
-                        if (this.value !== 'skip' && this.value !== 'custom') {
-                            const usedNums = assignments
-                                .filter((a, j) => j !== i && a.label === this.value && a.customNum > 0)
-                                .map(a => a.customNum);
-                            let next = 1;
-                            while (usedNums.includes(next)) next++;
-                            assignments[i].customNum = next;
-                            numInput.value = next;
-                        } else {
-                            assignments[i].customNum = null;
-                            numInput.value = '';
-                        }
+                        refreshSelectLabel(select, assignments[i]);
                         updatePreview();
                     });
                     numInput.addEventListener('input', function() {
                         const i = parseInt(this.dataset.idx);
                         const val = parseInt(this.value);
                         assignments[i].customNum = isNaN(val) || val < 1 ? null : val;
+                        refreshSelectLabel(select, assignments[i]);
                         updatePreview();
                     });
+                    refreshSelectLabel(select, item);
                 });
 
                 // ── Merged-log rows (subdued) ────────────────────────────────
@@ -2583,6 +2573,9 @@ ${payload}`;
 
                 const labelSelect = mergeModal.querySelector('#merge-label');
                 const numberInput = mergeModal.querySelector('#merge-number');
+                // Pre-fill number from the first selected assignment so it isn't lost
+                const firstNum = assignments[selectedArray[0]]?.customNum;
+                if (firstNum > 0) numberInput.value = firstNum;
                 
                 const mergeCustomInput = mergeModal.querySelector('#merge-custom-label');
                 labelSelect.addEventListener('change', function() {
@@ -2631,6 +2624,14 @@ ${payload}`;
                      mergeOverlay.remove();
                  };
             });
+
+            // Update the selected option text to show e.g. "Witness 2" when a number is set
+            function refreshSelectLabel(select, item) {
+                const opt = select.options[select.selectedIndex];
+                if (!opt || item.label === 'skip' || item.label === 'custom') return;
+                const base = item.label.charAt(0).toUpperCase() + item.label.slice(1);
+                opt.text = item.customNum > 0 ? `${base} ${item.customNum}` : base;
+            }
 
             function getLabelText(item) {
                 if (item.label === 'custom') return (item.customLabel || '').trim() || '(custom)';
