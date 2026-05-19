@@ -169,7 +169,7 @@
         @media print { .print-hide { display: none !important; } }
         table tr.grand-total td { background: var(--surface2); color: var(--text); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
-        .invoice-totals-table { table-layout: auto; }
+        .invoice-totals-table { table-layout: fixed; }
         .invoice-totals-table tbody td:nth-child(2) { border-right: 2px solid var(--border); }
         .blue-text { color: var(--border); }
         tr.rate-55 td { color: var(--border); }
@@ -2812,32 +2812,48 @@ ${payload}`;
             ind.textContent = '⏳ Generating PDF…';
             ind.classList.add('visible');
 
-            // Offscreen container in DOM first — ensures CSS class styles resolve on clone
+            // Put offscreen container in the document FIRST so CSS class styles resolve
             const offscreen = document.createElement('div');
-            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;background:#fff';
+            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;background:#fff';
             document.body.appendChild(offscreen);
+
+            // Clone into live document so getComputedStyle works correctly
             const clone = invoiceEl.cloneNode(true);
             offscreen.appendChild(clone);
 
             // Remove screen-only elements
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
-            clone.style.boxShadow = 'none';
 
-            // Only constrain the three data tables — leave invoice-totals-table alone
-            // so the copy-info and auth-hours text in its first columns stay visible
-            ['table-hours', 'table-mileage', 'table-expenses'].forEach(id => {
-                const t = clone.querySelector('#' + id);
-                if (!t) return;
+            // Container: tighten padding, remove shadow
+            clone.style.padding    = '20px 28px';
+            clone.style.boxShadow  = 'none';
+            clone.style.maxWidth   = '100%';
+            clone.style.boxSizing  = 'border-box';
+            clone.style.overflow   = 'hidden';
+
+            // Tables: fixed layout so th widths control columns; clip cell overflow
+            clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
                 t.style.width       = '100%';
                 t.style.maxWidth    = '100%';
-                t.querySelectorAll('td, th').forEach(cell => {
-                    cell.style.overflow     = 'hidden';
-                    cell.style.textOverflow = 'ellipsis';
-                });
-                // Fix colspans in subtotal/footer rows after print-hide columns removed
-                const totalCols = t.querySelectorAll('thead tr:first-child th').length;
-                t.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
+                t.style.boxSizing   = 'border-box';
+            });
+            // Cells: clip content; tighten padding (computed styles now valid since clone is in DOM)
+            clone.querySelectorAll('td, th').forEach(cell => {
+                cell.style.overflow      = 'hidden';
+                cell.style.textOverflow  = 'ellipsis';
+                cell.style.boxSizing     = 'border-box';
+                const cs = window.getComputedStyle(cell);
+                const pt = parseFloat(cs.paddingTop)    || 0;
+                const pb = parseFloat(cs.paddingBottom) || 0;
+                cell.style.paddingTop    = Math.max(2, pt - 3) + 'px';
+                cell.style.paddingBottom = Math.max(2, pb - 3) + 'px';
+            });
+
+            // Fix colspans in subtotal/footer rows after print-hide columns removed
+            clone.querySelectorAll('table').forEach(table => {
+                const totalCols = table.querySelectorAll('thead tr:first-child th').length;
+                table.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
                     const cells = Array.from(tr.cells);
                     if (cells.length < 2) return;
                     cells[0].colSpan = totalCols - (cells.length - 1);
