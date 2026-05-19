@@ -2436,9 +2436,14 @@ ${payload}`;
                     const numInput = document.createElement('input');
                     numInput.type = 'number';
                     numInput.min = '1';
-                    numInput.value = item.number || '';
+                    numInput.value = item.customNum || '';
                     numInput.placeholder = 'auto';
                     numInput.style.cssText = 'padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;text-align:center;width:100%';
+                    numInput.addEventListener('input', function() {
+                        const i = parseInt(row.dataset.idx);
+                        assignments[i].customNum = parseInt(this.value) || null;
+                        updatePreview();
+                    });
 
                     row.append(checkbox, nameDiv, labelCell, numInput);
                     listEl.appendChild(row);
