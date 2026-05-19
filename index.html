@@ -3120,13 +3120,15 @@ ${payload}`;
                         
                         let amount = 0;
                         const catLower = category.toLowerCase();
-                        if (catLower.includes('photocopy') || catLower.includes('copies')) {
+                        const isCopies = catLower.includes('photocopy') || catLower.includes('copies');
+                        if (isCopies) {
                             const rate = (catLower.includes('color')) ? getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, date) : getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw, date);
                             amount = qty * rate;
                         }
+                        const expenseDesc = isCopies ? 'Printed for Case File' : description;
 
                         const caseShortE = caseNumber.slice(-2);
-                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr data-case-id="${caseNumber}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortE}</td><td contenteditable="true">${category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim()}</td><td contenteditable="true">${description}</td><td contenteditable="true">${qty}</td><td class="amount-col" contenteditable="true">$${amount.toFixed(2)}</td></tr>`);
+                        subtotalRow.insertAdjacentHTML('beforebegin', `<tr data-case-id="${caseNumber}"><td contenteditable="true">${date}</td><td contenteditable="true" class="case-col print-hide">${caseShortE}</td><td contenteditable="true">${category.replace(/(investigator service|out of pocket)\s*-\s*/gi, '').trim()}</td><td contenteditable="true">${expenseDesc}</td><td contenteditable="true">${qty}</td><td class="amount-col" contenteditable="true">$${amount.toFixed(2)}</td></tr>`);
                         importCount++;
                     }
                 } else {
