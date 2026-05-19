@@ -1575,15 +1575,27 @@ Rules:
                 `[${i}] ${c.table} / ${c.date} / case ${c.caseNum} — ${c.text}`
             ).join('\n');
 
+            // Build a protected-names list from all description text so the AI
+            // never "corrects" a witness name, subject name, or any proper noun
+            // that appears in the invoice.
+            const nameTokens = [...new Set(
+                cells.flatMap(c => c.text.split(/[\s\-\/,;]+/))
+                     .filter(w => w.length > 1 && /^[A-Z][a-z]/.test(w) && !/^(Service|Hours|Mileage|Expenses|Case|Date|Witness|Route|Out|Pocket|Field|Ops|Scene|Doc|OSINT|Inv|Report|Discovery|Review|Intake|Audit|Surveillance|Interview|Interviews|Investigation|Investigative|Intelligence|Gathering|Tactical|Documentation|Photocopies|Photocopy|Printed|File|Court|County|Superior|Municipal|Office|Building|Street|Avenue|Road|Drive|North|South|East|West)$/.test(w))
+            )];
+            const protectedNames = nameTokens.length > 0
+                ? `\nProtected words — treat as proper nouns, NEVER flag or change: ${nameTokens.join(', ')}`
+                : '';
+
             const systemPrompt = `You are a spell checker for legal investigation invoices. Review the description lines and fix only genuine spelling errors.
 
 Rules:
 - Fix ONLY the misspelled word(s) — leave everything else in the line exactly as-is
 - Do NOT remove, reorder, or rewrite any part of the line beyond the misspelled word
 - Keep all names, proper nouns, abbreviations, punctuation, and structure intact
-- Do NOT flag: proper nouns you are unsure about, abbreviations, case numbers, legal/investigative terms, road names, city names
+- Do NOT flag: proper nouns you are unsure about, abbreviations, case numbers, legal/investigative terms, road names, city names, witness names, subject names
+- If you are not 100% certain a word is a common English misspelling, do NOT flag it
 - Flag the same word spelled differently across rows (e.g. "recieve" vs "receive")
-- Only return items where a clear misspelling exists
+- Only return items where a clear, unambiguous misspelling exists${protectedNames}
 
 Return ONLY a JSON array. Each object: {"idx":<row index from [N]>,"original":"<exact original description text>","suggestion":"<corrected description text only — no index, no case number, no quotes wrapper>","note":"<word that was fixed>"}
 If nothing needs fixing return: []`;
