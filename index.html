@@ -482,7 +482,7 @@
             <tbody>
                 <!-- Case data will be dynamically inserted here -->
             </tbody>
-            <tfoot><tr id="hours-merged-subtotal" class="subtotal"><td colspan="4" style="text-align:right">Subtotal:</td><td class="hours-col">0.0</td></tr></tfoot>
+            <tfoot><tr id="hours-merged-subtotal" class="subtotal"><td colspan="5" style="text-align:right">Subtotal:</td><td class="hours-col">0.0</td></tr></tfoot>
         </table>
 
         <button class="add-row-btn" onclick="addRowToTable('table-hours')">➕ Add Service Hours Row</button>
@@ -2785,6 +2785,20 @@ ${payload}`;
             const clone = invoiceEl.cloneNode(true);
             applyPrintStyles(clone);
 
+            // Remove screen-only elements from the clone
+            clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
+
+            // After removing print-hide columns, fix colspans in tfoot/subtotal rows
+            clone.querySelectorAll('table').forEach(table => {
+                const totalCols = table.querySelectorAll('thead tr:first-child th').length;
+                table.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
+                    const cells = Array.from(tr.cells);
+                    if (cells.length < 2) return;
+                    // First cell spans everything except the last value cell
+                    cells[0].colSpan = totalCols - (cells.length - 1);
+                });
+            });
+
             // Add page-break hints so tables don't split rows awkwardly
             clone.querySelectorAll('tr').forEach(tr => {
                 tr.style.setProperty('page-break-inside', 'avoid', 'important');
@@ -2809,8 +2823,8 @@ ${payload}`;
             offscreen.appendChild(clone);
             document.body.appendChild(offscreen);
 
-            // html2canvas cannot resolve CSS custom properties — override them with explicit
-            // light-theme values so the PDF renders with proper colors instead of B&W
+            // html2canvas cannot resolve CSS custom properties — set variables then
+            // immediately inline all computed colors so html2canvas sees plain RGB values
             clone.style.setProperty('--bg',       '#ffffff');
             clone.style.setProperty('--surface',  '#f4f6fa');
             clone.style.setProperty('--surface2', '#e8ecf4');
@@ -2819,6 +2833,19 @@ ${payload}`;
             clone.style.setProperty('--accent',   '#00aa88');
             clone.style.setProperty('--accent2',  '#0066cc');
             clone.style.setProperty('--muted',    '#555555');
+
+            (function inlineColors(el) {
+                const cs = window.getComputedStyle(el);
+                const color = cs.color;
+                const bg    = cs.backgroundColor;
+                const btop  = cs.borderTopColor;
+                const bbot  = cs.borderBottomColor;
+                if (color) el.style.color = color;
+                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') el.style.backgroundColor = bg;
+                if (btop) el.style.borderTopColor = btop;
+                if (bbot) el.style.borderBottomColor = bbot;
+                Array.from(el.children).forEach(inlineColors);
+            })(clone);
 
             try {
                 // Generate PDF as a blob so we can use the save-file picker
