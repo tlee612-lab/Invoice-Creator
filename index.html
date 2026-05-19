@@ -1029,21 +1029,9 @@
                 </tr>`);
             }
 
-            // Mileage rows — one per rate tier, sorted low→high
-            const sortedMileRates = [...milesByRate.entries()].sort((a, b) => a[0] - b[0]);
-            sortedMileRates.forEach(([rate, mi]) => {
-                const amt = mi * rate;
-                grandTotal += amt;
-                rows.push(`<tr>
-                    <td contenteditable="true"></td>
-                    <td contenteditable="true"></td>
-                    <td contenteditable="true">Mileage @ $${rate.toFixed(2)}/mi</td>
-                    <td style="text-align:center" contenteditable="true">${mi.toFixed(1)} mi</td>
-                    <td style="text-align:center" contenteditable="true">$${rate.toFixed(2)}</td>
-                    <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
-                </tr>`);
-            });
-            if (sortedMileRates.length === 0) {
+            // Mileage rows — always show every configured rate tier (even 0.0) for verification
+            const allMileRatesSorted = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
+            if (allMileRatesSorted.length === 0) {
                 rows.push(`<tr>
                     <td contenteditable="true"></td><td contenteditable="true"></td>
                     <td contenteditable="true">Mileage</td>
@@ -1051,6 +1039,20 @@
                     <td style="text-align:center" contenteditable="true">—</td>
                     <td class="amount-col" contenteditable="true">$0.00</td>
                 </tr>`);
+            } else {
+                allMileRatesSorted.forEach(rate => {
+                    const mi = milesByRate.get(rate) || 0;
+                    const amt = mi * rate;
+                    grandTotal += amt;
+                    rows.push(`<tr>
+                        <td contenteditable="true"></td>
+                        <td contenteditable="true"></td>
+                        <td contenteditable="true">Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}/mi</td>
+                        <td style="text-align:center" contenteditable="true">${mi.toFixed(1)} mi</td>
+                        <td style="text-align:center" contenteditable="true">$${rate.toFixed(3).replace(/\.?0+$/, '')}</td>
+                        <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
+                    </tr>`);
+                });
             }
 
             // Expenses row
