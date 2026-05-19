@@ -1598,7 +1598,9 @@ Return ONLY a raw JSON array — no explanation, no markdown:
 If nothing to fix: []`;
 
             try {
+                console.log('[SpellCheck] Payload sent to AI:\n' + payload);
                 const result = await callAI(systemPrompt, payload);
+                console.log('[SpellCheck] Raw AI response:\n' + result);
                 let corrections = [];
                 // Strip markdown fences, then find the first [ that starts a
                 // JSON array (object array OR empty). Use a balanced-bracket
@@ -1631,8 +1633,8 @@ If nothing to fix: []`;
                 ind.classList.remove('visible');
 
                 if (corrections.length === 0) {
-                    ind.textContent = `✓ Spell check complete — no issues found`; ind.classList.add('visible');
-                    setTimeout(() => ind.classList.remove('visible'), 4000);
+                    ind.textContent = `✓ No issues found (${cells.length} row${cells.length !== 1 ? 's' : ''} checked)`; ind.classList.add('visible');
+                    setTimeout(() => ind.classList.remove('visible'), 5000);
                     return;
                 }
                 _showSpellCheckModal(corrections, cells);
