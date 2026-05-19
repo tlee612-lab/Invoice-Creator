@@ -1572,7 +1572,7 @@ Rules:
             ind.textContent = '⏳ Spell checking…'; ind.classList.add('visible');
 
             const payload = cells.map((c, i) =>
-                `[${i}] ${c.table} / ${c.date} / case ${c.caseNum} — ${c.text}`
+                `[${i}] ${c.text}`
             ).join('\n');
 
             // Build a protected-names list from all description text so the AI
