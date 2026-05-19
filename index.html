@@ -1056,17 +1056,18 @@
             const grandTotalRow = totalsTable.querySelector('tr.grand-total');
 
             if (authHours > 0 && grandTotalRow) {
-                if (totalHoursBilled > authHours) {
-                    const overage = (totalHoursBilled - authHours).toFixed(1);
-                    grandTotalRow.cells[0].textContent = `⚠️ +${overage} hrs over auth`;
-                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:var(--warning, #f88);';
-                    grandTotalRow.cells[1].style.cssText = '';
+                const diff = parseFloat((totalHoursBilled - authHours).toFixed(1));
+                if (diff > 0) {
+                    grandTotalRow.cells[0].textContent = `⚠ +${diff.toFixed(1)} hrs over auth`;
+                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:#f66;';
+                } else if (diff < 0) {
+                    grandTotalRow.cells[0].textContent = `↓ ${Math.abs(diff).toFixed(1)} hrs remaining`;
+                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:#6af;';
                 } else {
-                    const remaining = (authHours - totalHoursBilled).toFixed(1);
-                    grandTotalRow.cells[0].textContent = `✓ ${remaining} hrs remaining`;
-                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:var(--accent);';
-                    grandTotalRow.cells[1].style.cssText = '';
+                    grandTotalRow.cells[0].textContent = `✓ Exactly on auth`;
+                    grandTotalRow.cells[0].style.cssText = 'font-weight:bold; text-align:left; color:#6c6;';
                 }
+                grandTotalRow.cells[1].style.cssText = '';
             } else if (grandTotalRow) {
                 grandTotalRow.cells[0].textContent = '';
                 grandTotalRow.cells[0].style.cssText = '';
