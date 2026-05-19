@@ -2461,6 +2461,19 @@ ${payload}`;
                         assignments[i].label = this.value;
                         customLabelInput.style.display = this.value === 'custom' ? 'block' : 'none';
                         if (this.value !== 'custom') assignments[i].customLabel = null;
+                        // Auto-fill the number input with the next sequential number for this label
+                        if (this.value !== 'skip' && this.value !== 'custom') {
+                            const usedNums = assignments
+                                .filter((a, j) => j !== i && a.label === this.value && a.customNum > 0)
+                                .map(a => a.customNum);
+                            let next = 1;
+                            while (usedNums.includes(next)) next++;
+                            assignments[i].customNum = next;
+                            numInput.value = next;
+                        } else {
+                            assignments[i].customNum = null;
+                            numInput.value = '';
+                        }
                         updatePreview();
                     });
                     numInput.addEventListener('input', function() {
