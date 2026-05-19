@@ -1558,7 +1558,6 @@ Rules:
                 });
             };
             collectRows('table-hours',    3, 'Service Hours');
-            collectRows('table-mileage',  2, 'Mileage');
             collectRows('table-expenses', 3, 'Expenses');
 
             if (cells.length === 0) {
@@ -1572,7 +1571,7 @@ Rules:
             ind.textContent = '⏳ Spell checking…'; ind.classList.add('visible');
 
             const payload = cells.map((c, i) =>
-                `[${i}] ${c.text}`
+                `Row ${i}: ${c.text}`
             ).join('\n');
 
             const systemPrompt = `You are a spell checker for legal investigation invoices. Review each description line and fix genuine spelling errors.
@@ -1585,7 +1584,7 @@ Rules:
 - Flag the same word spelled differently across rows
 - Return every line that has a misspelling — do not skip
 
-Return ONLY a JSON array. Each object: {"idx":<number from [N]>,"original":"<exact original text>","suggestion":"<full corrected line>","note":"<word fixed>"}
+Return ONLY a JSON array. Each object: {"idx":<Row number>,"original":"<exact original text>","suggestion":"<full corrected line>","note":"<word fixed>"}
 If nothing needs fixing return: []`;
 
             try {
@@ -1622,8 +1621,9 @@ If nothing needs fixing return: []`;
                 ind.classList.remove('visible');
 
                 if (corrections.length === 0) {
-                    ind.textContent = '✓ No spelling issues found'; ind.classList.add('visible');
-                    setTimeout(() => ind.classList.remove('visible'), 3000);
+                    const preview = cleaned.slice(0, 300).replace(/\n/g, ' ');
+                    ind.textContent = `✓ No issues — raw: ${preview}`; ind.classList.add('visible');
+                    setTimeout(() => ind.classList.remove('visible'), 15000);
                     return;
                 }
                 _showSpellCheckModal(corrections, cells);
