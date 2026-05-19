@@ -1603,19 +1603,32 @@ If nothing needs fixing return: []`;
             try {
                 const result = await callAI(systemPrompt, payload);
                 let corrections = [];
-                // Extract the first balanced [...] array — greedy regex fails when
-                // the AI appends explanation text containing extra ] characters.
+                // Extract the first array-of-objects ([{...}]) from the response.
+                // Start search from '[{' so lone index markers like [0] or [1]
+                // in the AI's text are not mistaken for the corrections array.
+                // Falls back to '[]' (empty array) if the AI signals no issues.
+                const cleaned = result.replace(/```[a-z]*/gi, '').replace(/```/g, '');
                 const arrayStr = (function extractArray(s) {
-                    const start = s.indexOf('[');
+                    // Prefer array-of-objects; also accept bare []
+                    const objStart = s.indexOf('[{');
+                    const emptyArr = s.indexOf('[]');
+                    const start = objStart !== -1 ? objStart : (emptyArr !== -1 ? emptyArr : -1);
                     if (start === -1) return null;
+                    if (s[start + 1] === ']') return '[]'; // bare []
                     let depth = 0;
                     for (let i = start; i < s.length; i++) {
                         if (s[i] === '[') depth++;
                         else if (s[i] === ']') { depth--; if (depth === 0) return s.slice(start, i + 1); }
                     }
                     return null;
-                })(result.replace(/```[a-z]*/gi, '').replace(/```/g, ''));
-                if (arrayStr) corrections = JSON.parse(arrayStr);
+                })(cleaned);
+                if (arrayStr) {
+                    try {
+                        corrections = JSON.parse(arrayStr);
+                    } catch (parseErr) {
+                        throw new Error(`JSON parse failed (${parseErr.message}) — raw: ${arrayStr.slice(0, 120)}`);
+                    }
+                }
 
                 ind.classList.remove('visible');
 
