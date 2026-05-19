@@ -1591,8 +1591,19 @@ If nothing needs fixing return: []`;
             try {
                 const result = await callAI(systemPrompt, payload);
                 let corrections = [];
-                const jsonMatch = result.match(/\[[\s\S]*\]/);
-                if (jsonMatch) corrections = JSON.parse(jsonMatch[0]);
+                // Extract the first balanced [...] array — greedy regex fails when
+                // the AI appends explanation text containing extra ] characters.
+                const arrayStr = (function extractArray(s) {
+                    const start = s.indexOf('[');
+                    if (start === -1) return null;
+                    let depth = 0;
+                    for (let i = start; i < s.length; i++) {
+                        if (s[i] === '[') depth++;
+                        else if (s[i] === ']') { depth--; if (depth === 0) return s.slice(start, i + 1); }
+                    }
+                    return null;
+                })(result.replace(/```[a-z]*/gi, '').replace(/```/g, ''));
+                if (arrayStr) corrections = JSON.parse(arrayStr);
 
                 ind.classList.remove('visible');
 
