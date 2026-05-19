@@ -2764,12 +2764,18 @@ ${payload}`;
             // Remove screen-only elements from the clone
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
 
-            // Constrain all tables to 100% width so nothing overflows the page
+            // Constrain all tables to 100% width so nothing overflows the page.
+            // overflow:hidden on every cell stops html2canvas from measuring
+            // visual text-overflow (white-space:nowrap) as extra page width.
             clone.style.overflowX = 'hidden';
             clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
                 t.style.width = '100%';
                 t.style.maxWidth = '100%';
+            });
+            clone.querySelectorAll('td, th').forEach(cell => {
+                cell.style.overflow = 'hidden';
+                cell.style.maxWidth = '0'; // forces table-layout:fixed to honour column widths
             });
 
             // After removing print-hide columns, fix colspans in tfoot/subtotal rows
