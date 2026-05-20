@@ -159,7 +159,7 @@
         table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; table-layout: fixed; }
         #table-hours td:nth-child(3), #table-hours td:nth-child(4),
         #table-mileage td:nth-child(3),
-        #table-expenses td:nth-child(4) { white-space: normal; word-break: break-word; }
+        #table-expenses td:nth-child(3), #table-expenses td:nth-child(4) { white-space: normal; word-break: break-word; }
         .section-heading { font-size: 13px; font-weight: bold; background: var(--surface2); padding: 8px 8px 4px 8px; margin-top: 5px; margin-bottom: 0; color: var(--text); }
         table thead { background: var(--surface2); }
         table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--text); }
@@ -729,8 +729,8 @@
                 .replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
                 .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
                 .replace(/witness development & interviews/gi, 'Witness Interviews')
-                .replace(/case intake & file audit/gi, 'Case Intake and Audit')
-                .replace(/tactical field operations & scene documentation/gi, 'Field Ops & Scene Doc')
+                .replace(/case intake & file audit/gi, 'Intake & Audit')
+                .replace(/tactical field operations & scene documentation/gi, 'Field Ops')
                 .replace(/intelligence gathering\s*&\s*osint/gi, 'OSINT')
                 .replace(/investigative reporting\s*&\s*documentation/gi, 'Inv. Report / Doc')
                 .trim();
