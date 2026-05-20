@@ -2813,12 +2813,46 @@ ${payload}`;
             ind.classList.add('visible');
 
             // Put offscreen container in the document FIRST so CSS class styles resolve.
-            // color-scheme:only light prevents Chrome auto-dark from inverting table colors.
             const offscreen = document.createElement('div');
-            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;background:#fff;color-scheme:only light;color:#111111';
+            offscreen.id = 'pdf-offscreen-render';
+            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden';
             document.body.appendChild(offscreen);
 
-            // Clone into live document so getComputedStyle works correctly
+            // Inject a scoped <style> that overrides the dark :root variables and forces
+            // light-mode colors for the offscreen container. html2canvas parses the live
+            // stylesheet, so this is more reliable than setting inline custom properties.
+            const pdfStyle = document.createElement('style');
+            pdfStyle.id = 'pdf-light-override';
+            pdfStyle.textContent = `
+                #pdf-offscreen-render {
+                    --bg:      #ffffff;
+                    --surface: #f4f6fa;
+                    --surface2:#e8ecf4;
+                    --border:  #0066cc;
+                    --text:    #111111;
+                    --accent:  #00aa88;
+                    --accent2: #0066cc;
+                    --muted:   #555555;
+                    color-scheme: only light;
+                    background: #ffffff !important;
+                    color: #111111 !important;
+                }
+                #pdf-offscreen-render table thead { background: #e8ecf4 !important; }
+                #pdf-offscreen-render table th  { color: #111111 !important; border-bottom-color: #0066cc !important; }
+                #pdf-offscreen-render table td  { color: #111111 !important; border-bottom-color: #0066cc !important; }
+                #pdf-offscreen-render table tr.case-header td  { background: #f4f6fa !important; color: #111111 !important; }
+                #pdf-offscreen-render table tr.subtotal td     { background: #e8ecf4 !important; color: #111111 !important; }
+                #pdf-offscreen-render table tr.grand-total td  { background: #e8ecf4 !important; color: #111111 !important; }
+                #pdf-offscreen-render .blue-text               { color: #0066cc !important; }
+                #pdf-offscreen-render tr.rate-55 td            { color: #0066cc !important; }
+                #pdf-offscreen-render .invoice-totals-table tbody td:nth-child(2) { border-right-color: #0066cc !important; }
+                #pdf-offscreen-render .totals-section          { border-top-color: #0066cc !important; }
+                #pdf-offscreen-render .total-item              { background: #e8ecf4 !important; border-color: #0066cc !important; color: #111111 !important; }
+                #pdf-offscreen-render .section-heading         { color: #0066cc !important; border-bottom-color: #0066cc !important; }
+            `;
+            document.head.appendChild(pdfStyle);
+
+            // Clone into live document so CSS resolves correctly
             const clone = invoiceEl.cloneNode(true);
             offscreen.appendChild(clone);
 
@@ -2843,10 +2877,9 @@ ${payload}`;
             const cloneTotals = clone.querySelector('.invoice-totals-table');
             if (cloneTotals) {
                 cloneTotals.style.tableLayout = 'auto';
-                // Remove any hidden inputs/selects inside totals that could bleed dark backgrounds
                 cloneTotals.querySelectorAll('input, select, button, textarea').forEach(el => el.remove());
             }
-            // Cells: clip content; tighten padding (computed styles now valid since clone is in DOM)
+            // Cells: clip content; tighten vertical padding
             clone.querySelectorAll('td, th').forEach(cell => {
                 cell.style.overflow      = 'hidden';
                 cell.style.textOverflow  = 'ellipsis';
@@ -2881,37 +2914,6 @@ ${payload}`;
                 el.style.setProperty('page-break-inside', 'avoid', 'important');
                 el.style.setProperty('break-inside',      'avoid', 'important');
             });
-
-            // Force light color scheme so computed defaults (text, backgrounds) use light-mode values.
-            // Without this, dark-mode browsers return white as the computed text color for elements
-            // that don't have an explicit color rule, which inlineColors would bake in as white-on-white.
-            clone.style.colorScheme     = 'only light';
-            clone.style.color           = '#111111';
-            clone.style.backgroundColor = '#ffffff';
-
-            // html2canvas cannot resolve CSS custom properties — set variables then
-            // immediately inline all computed colors so html2canvas sees plain RGB values
-            clone.style.setProperty('--bg',       '#ffffff');
-            clone.style.setProperty('--surface',  '#f4f6fa');
-            clone.style.setProperty('--surface2', '#e8ecf4');
-            clone.style.setProperty('--border',   '#0066cc');
-            clone.style.setProperty('--text',     '#111111');
-            clone.style.setProperty('--accent',   '#00aa88');
-            clone.style.setProperty('--accent2',  '#0066cc');
-            clone.style.setProperty('--muted',    '#555555');
-
-            (function inlineColors(el) {
-                const cs = window.getComputedStyle(el);
-                const color = cs.color;
-                const bg    = cs.backgroundColor;
-                const btop  = cs.borderTopColor;
-                const bbot  = cs.borderBottomColor;
-                if (color) el.style.color = color;
-                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') el.style.backgroundColor = bg;
-                if (btop) el.style.borderTopColor = btop;
-                if (bbot) el.style.borderBottomColor = bbot;
-                Array.from(el.children).forEach(inlineColors);
-            })(clone);
 
             try {
                 // Generate PDF as a blob so we can use the save-file picker
@@ -2991,6 +2993,7 @@ ${payload}`;
                 }, 4000);
             } finally {
                 offscreen.remove();
+                document.getElementById('pdf-light-override')?.remove();
             }
         }
 
