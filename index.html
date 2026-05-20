@@ -729,8 +729,10 @@
                 .replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
                 .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
                 .replace(/witness development & interviews/gi, 'Witness Interviews')
-                .replace(/case intake & file audit/gi, 'Intake & Audit')
+                .replace(/case intake (&|and) file audit/gi, 'Intake & Audit')
+                .replace(/case intake and audit/gi, 'Intake & Audit')
                 .replace(/tactical field operations & scene documentation/gi, 'Field Ops')
+                .replace(/field ops & scene doc/gi, 'Field Ops')
                 .replace(/intelligence gathering\s*&\s*osint/gi, 'OSINT')
                 .replace(/investigative reporting\s*&\s*documentation/gi, 'Inv. Report / Doc')
                 .trim();
