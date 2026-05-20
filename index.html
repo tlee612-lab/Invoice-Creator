@@ -2812,9 +2812,10 @@ ${payload}`;
             ind.textContent = '⏳ Generating PDF…';
             ind.classList.add('visible');
 
-            // Put offscreen container in the document FIRST so CSS class styles resolve
+            // Put offscreen container in the document FIRST so CSS class styles resolve.
+            // color-scheme:only light prevents Chrome auto-dark from inverting table colors.
             const offscreen = document.createElement('div');
-            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;background:#fff';
+            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;background:#fff;color-scheme:only light;color:#111111';
             document.body.appendChild(offscreen);
 
             // Clone into live document so getComputedStyle works correctly
@@ -2884,9 +2885,8 @@ ${payload}`;
             // Force light color scheme so computed defaults (text, backgrounds) use light-mode values.
             // Without this, dark-mode browsers return white as the computed text color for elements
             // that don't have an explicit color rule, which inlineColors would bake in as white-on-white.
-            offscreen.style.colorScheme = 'light only';
-            clone.style.colorScheme     = 'light only';
-            clone.style.color           = '#111111';   // explicit base text color
+            clone.style.colorScheme     = 'only light';
+            clone.style.color           = '#111111';
             clone.style.backgroundColor = '#ffffff';
 
             // html2canvas cannot resolve CSS custom properties — set variables then
