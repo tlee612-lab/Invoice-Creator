@@ -2838,17 +2838,17 @@ ${payload}`;
                 t.style.maxWidth    = '100%';
                 t.style.boxSizing   = 'border-box';
             });
-            // Invoice totals table: use auto layout so description text isn't clipped
+            // Invoice totals table: auto layout so description column sizes to content
             const cloneTotals = clone.querySelector('.invoice-totals-table');
             if (cloneTotals) {
                 cloneTotals.style.tableLayout = 'auto';
+                // Remove any hidden inputs/selects inside totals that could bleed dark backgrounds
+                cloneTotals.querySelectorAll('input, select, button, textarea').forEach(el => el.remove());
             }
             // Cells: clip content; tighten padding (computed styles now valid since clone is in DOM)
             clone.querySelectorAll('td, th').forEach(cell => {
-                const inTotals = cell.closest('.invoice-totals-table');
-                cell.style.overflow      = inTotals ? 'visible' : 'hidden';
-                cell.style.textOverflow  = inTotals ? 'clip'    : 'ellipsis';
-                cell.style.whiteSpace    = inTotals ? 'nowrap'  : '';
+                cell.style.overflow      = 'hidden';
+                cell.style.textOverflow  = 'ellipsis';
                 cell.style.boxSizing     = 'border-box';
                 const cs = window.getComputedStyle(cell);
                 const pt = parseFloat(cs.paddingTop)    || 0;
@@ -2899,15 +2899,7 @@ ${payload}`;
                 const btop  = cs.borderTopColor;
                 const bbot  = cs.borderBottomColor;
                 if (color) el.style.color = color;
-                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
-                    // Only apply background if it's light enough (brightness > 30/255)
-                    // This prevents dark-mode computed colors or stray black backgrounds
-                    const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-                    if (m) {
-                        const brightness = (+m[1] * 299 + +m[2] * 587 + +m[3] * 114) / 1000;
-                        if (brightness > 30) el.style.backgroundColor = bg;
-                    }
-                }
+                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') el.style.backgroundColor = bg;
                 if (btop) el.style.borderTopColor = btop;
                 if (bbot) el.style.borderBottomColor = bbot;
                 Array.from(el.children).forEach(inlineColors);
