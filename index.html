@@ -200,7 +200,7 @@
         </div>
         <div style="font-size: 11px; color: var(--muted); margin-bottom: 5px;">Tip: Paste a spreadsheet or drop a PAE.</div>
         <textarea id="paste-area" placeholder="Paste spreadsheet data or drop a PAE..."></textarea>
-        <div style="display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
+        <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
             <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 PAE File</button>
             <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
             <button onclick="importFromPasteArea()" title="Import data from the paste box" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📋 Import</button>
@@ -212,6 +212,7 @@
             <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Anonymize</button>
             <button onclick="spellCheckInvoice()" title="AI spell check all descriptions" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🔤 Spell</button>
             <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">✅ Validate</button>
+            <button id="btn-test" onclick="testPdf()" title="Test" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🧪 Test</button>
         </div>
             <input type="file" id="pdf-input" accept=".pdf" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
             <input type="file" id="json-input" accept=".json" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
@@ -1417,6 +1418,11 @@
             }
 
             // Validation: check for errors, missing fields, rate mistakes, duplicates, etc.
+        }
+
+        function testPdf() {
+            // Test button — wire up as needed
+            console.log('Test button clicked');
         }
 
         async function validateInvoice() {
