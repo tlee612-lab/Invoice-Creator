@@ -165,7 +165,7 @@
         #table-hours tr.case-header, #table-mileage tr.case-header, #table-expenses tr.case-header { display: none !important; }
         #table-hours tbody tr.subtotal, #table-mileage tbody tr.subtotal, #table-expenses tbody tr.subtotal { display: none !important; }
         .case-col { width: 30px; min-width: 30px; max-width: 30px; text-align: center; font-size: 11px; color: var(--muted, #888); font-weight: normal; }
-        .running-col { width: 60px; text-align: right; font-size: 11px; color: var(--muted, #888); font-style: italic; border-bottom: none !important; }
+        .running-col { width: 60px; text-align: right; font-size: 11px; color: var(--muted, #888); font-style: italic; border-bottom: none !important; border-top: none !important; }
         @media print { .print-hide { display: none !important; } }
         table tr.grand-total td { background: var(--surface2); color: var(--text); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
@@ -465,7 +465,7 @@
         <h2 class="section-heading">SERVICE HOURS</h2>
         <table id="table-hours">
             <thead>
-                <tr><th style="width: 80px;">Date</th><th class="case-col print-hide">Case</th><th style="width: 120px;">Category</th><th>Description</th><th class="running-col print-hide">Running</th><th class="hours-col">Hours</th></tr>
+                <tr><th style="width: 80px;">Date</th><th class="case-col print-hide">Case</th><th style="width: 120px;">Category</th><th>Description</th><th class="running-col print-hide"></th><th class="hours-col">Hours</th></tr>
             </thead>
             <tbody>
                 <!-- Case data will be dynamically inserted here -->
