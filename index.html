@@ -2879,43 +2879,27 @@ ${payload}`;
                 el.style.setProperty('break-inside',      'avoid', 'important');
             });
 
-            // Force light-mode colors directly as inline styles — bypasses CSS variable
-            // resolution entirely so html2canvas sees plain values regardless of dark :root theme.
-            const B = '#0066cc', T = '#111111', S = '#f4f6fa', S2 = '#e8ecf4', MU = '#555555';
-            clone.style.backgroundColor = S;
-            clone.style.color = T;
-            clone.querySelectorAll('table').forEach(t => { t.style.backgroundColor = '#ffffff'; });
-            clone.querySelectorAll('table thead, table thead tr').forEach(el => { el.style.backgroundColor = S2; });
-            clone.querySelectorAll('table th').forEach(el => {
-                el.style.color = T; el.style.backgroundColor = S2;
-                el.style.borderBottomColor = B; el.style.borderTopColor = B;
-            });
-            clone.querySelectorAll('table td').forEach(el => {
-                el.style.color = T; el.style.borderBottomColor = B;
-            });
-            clone.querySelectorAll('tr.case-header td').forEach(el => {
-                el.style.backgroundColor = S; el.style.color = T; el.style.borderBottomColor = B;
-            });
-            clone.querySelectorAll('tr.subtotal td').forEach(el => {
-                el.style.backgroundColor = S2; el.style.color = T;
-                el.style.borderTopColor = B; el.style.borderBottomColor = B;
-            });
-            clone.querySelectorAll('tr.grand-total td').forEach(el => {
-                el.style.backgroundColor = S2; el.style.color = T;
-                el.style.borderTopColor = B; el.style.borderBottomColor = B;
-            });
-            clone.querySelectorAll('.blue-text, tr.rate-55 td').forEach(el => { el.style.color = B; });
-            clone.querySelectorAll('.case-col, .running-col').forEach(el => { el.style.color = MU; });
-            clone.querySelectorAll('.section-heading').forEach(el => {
-                el.style.color = B; el.style.borderBottomColor = B; el.style.backgroundColor = 'transparent';
-            });
-            clone.querySelectorAll('.totals-section').forEach(el => { el.style.borderTopColor = B; });
-            clone.querySelectorAll('.total-item').forEach(el => {
-                el.style.backgroundColor = S2; el.style.borderColor = B; el.style.color = T;
-            });
-            clone.querySelectorAll('.invoice-totals-table tbody td:nth-child(2)').forEach(el => {
-                el.style.borderRightColor = B;
-            });
+            // Inject a light-mode override into the MAIN document before rendering.
+            // html2canvas reads computed styles from the live document — this is the
+            // only reliable way to override the dark :root CSS variables.
+            const pdfLightStyle = document.createElement('style');
+            pdfLightStyle.textContent = `
+                .invoice-container                        { background:#f4f6fa !important; color:#111111 !important; }
+                .invoice-container table                  { background:#ffffff !important; }
+                .invoice-container table thead            { background:#e8ecf4 !important; }
+                .invoice-container table th               { color:#111111 !important; background:#e8ecf4 !important; border-color:#0066cc !important; }
+                .invoice-container table td               { color:#111111 !important; border-bottom-color:#0066cc !important; }
+                .invoice-container tr.case-header td      { background:#f4f6fa !important; color:#111111 !important; }
+                .invoice-container tr.subtotal td         { background:#e8ecf4 !important; color:#111111 !important; border-color:#0066cc !important; }
+                .invoice-container tr.grand-total td      { background:#e8ecf4 !important; color:#111111 !important; border-color:#0066cc !important; }
+                .invoice-container .blue-text             { color:#0066cc !important; }
+                .invoice-container tr.rate-55 td          { color:#0066cc !important; }
+                .invoice-container .section-heading       { color:#0066cc !important; border-color:#0066cc !important; background:transparent !important; }
+                .invoice-container .totals-section        { border-top-color:#0066cc !important; }
+                .invoice-container .total-item            { background:#e8ecf4 !important; color:#111111 !important; border-color:#0066cc !important; }
+                .invoice-container .invoice-totals-table tbody td:nth-child(2) { border-right-color:#0066cc !important; }
+            `;
+            document.head.appendChild(pdfLightStyle);
 
             try {
                 // Generate PDF as a blob so we can use the save-file picker
@@ -2923,39 +2907,7 @@ ${payload}`;
                     margin:      0.4,
                     filename:    filename,
                     image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff',
-                        onclone: function(clonedDoc) {
-                            // Remove the dark stylesheet so it cannot override anything
-                            clonedDoc.querySelectorAll('style').forEach(s => s.remove());
-                            // Force light color-scheme on the root element
-                            clonedDoc.documentElement.style.colorScheme = 'only light';
-                            // Inject a clean light-mode stylesheet
-                            const s = clonedDoc.createElement('style');
-                            s.textContent = `
-                                html, body { color-scheme: only light; }
-                                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-                                body { background:#ffffff; color:#111111; font-family:Barlow,Arial,sans-serif; }
-                                table { border-collapse:collapse; width:100%; }
-                                table th { font-weight:bold; text-align:left; padding:5px 6px; background:#e8ecf4; color:#111111; border-bottom:1px solid #0066cc; }
-                                table td { padding:3px 6px; color:#111111; border-bottom:1px solid #0066cc; white-space:nowrap; }
-                                table thead { background:#e8ecf4; }
-                                tr.case-header td { background:#f4f6fa; font-weight:bold; color:#111111; }
-                                tr.subtotal td { background:#e8ecf4; font-weight:bold; color:#111111; border-top:2px solid #0066cc; border-bottom:2px solid #0066cc; }
-                                tr.grand-total td { background:#e8ecf4; font-weight:bold; color:#111111; border-top:2px solid #0066cc; border-bottom:2px solid #0066cc; }
-                                .blue-text, tr.rate-55 td { color:#0066cc !important; }
-                                .hours-col,.miles-col,.amount-col { text-align:right; width:80px; }
-                                .case-col { width:30px; text-align:center; font-size:11px; color:#555555; font-weight:normal; }
-                                .running-col { width:60px; text-align:right; font-size:11px; color:#555555; font-style:italic; border-bottom:none !important; }
-                                .section-heading { color:#0066cc; font-weight:bold; font-size:14px; border-bottom:2px solid #0066cc; padding-bottom:4px; margin-bottom:8px; }
-                                .invoice-totals-table { table-layout:auto; }
-                                .invoice-totals-table tbody td:nth-child(2) { border-right:2px solid #0066cc; }
-                                .totals-section { border-top:2px solid #0066cc; margin-top:30px; padding-top:20px; }
-                                .total-item { display:flex; justify-content:space-between; padding:8px; background:#e8ecf4; border:1px solid #0066cc; color:#111111; font-size:12px; }
-                                .invoice-container { background:#f4f6fa; }
-                            `;
-                            clonedDoc.head.appendChild(s);
-                        }
-                    },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
                     jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
                     pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
                 }).from(clone).output('blob');
@@ -3027,6 +2979,7 @@ ${payload}`;
                 }, 4000);
             } finally {
                 offscreen.remove();
+                pdfLightStyle.remove();
             }
         }
 
