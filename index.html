@@ -1488,14 +1488,39 @@
 
             // Write into a hidden iframe so html2canvas renders a clean light-mode document
             const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:1100px;border:none;';
+            iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:5000px;border:none;';
             document.body.appendChild(iframe);
             iframe.contentDocument.open();
             iframe.contentDocument.write(htmlDoc);
             iframe.contentDocument.close();
 
-            // Wait for iframe to render
-            await new Promise(r => setTimeout(r, 300));
+            // Wait for iframe to render then size to content
+            await new Promise(r => setTimeout(r, 400));
+            const contentH = iframe.contentDocument.body.scrollHeight;
+            iframe.style.height = Math.max(contentH, 1100) + 'px';
+            await new Promise(r => setTimeout(r, 100));
+
+            // Capture raw canvas first — shows exactly what html2canvas sees
+            const testCanvas = await html2canvas(iframe.contentDocument.body, {
+                scale: 1, useCORS: true, backgroundColor: '#ffffff',
+                windowWidth: 816, width: 816, height: contentH
+            });
+
+            // Show canvas as image in an overlay so we can see if colors are right
+            const dbgOverlay = document.createElement('div');
+            dbgOverlay.style.cssText = 'position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,0.85);overflow:auto;padding:20px;box-sizing:border-box;';
+            const dbgImg = document.createElement('img');
+            dbgImg.src = testCanvas.toDataURL('image/png');
+            dbgImg.style.cssText = 'max-width:100%;display:block;margin:0 auto;border:2px solid #0f0;';
+            const dbgClose = document.createElement('button');
+            dbgClose.textContent = '✕ Close';
+            dbgClose.style.cssText = 'display:block;margin:0 auto 12px;padding:8px 20px;background:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer;';
+            dbgClose.onclick = () => dbgOverlay.remove();
+            dbgOverlay.appendChild(dbgClose);
+            dbgOverlay.appendChild(dbgImg);
+            document.body.appendChild(dbgOverlay);
+            iframe.remove();
+            return; // stop here — check colors in the canvas image first
 
             try {
                 const pdfBlob = await html2pdf().set({
