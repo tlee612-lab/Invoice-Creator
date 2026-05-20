@@ -1458,32 +1458,28 @@
                 });
             });
 
-            // Build a self-contained HTML document with only light-mode CSS — no variables
-            const lightCSS = `
-                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-                body { background: #ffffff; color: #111111; font-family: Arial, Helvetica, sans-serif; width: 816px; }
-                .invoice-container { background: #f4f6fa; padding: 20px 28px; }
-                table { border-collapse: collapse; width: 100%; }
-                table thead, table thead tr { background: #e8ecf4; }
-                table th { color: #111111; background: #e8ecf4; padding: 5px 6px; border-bottom: 1px solid #0066cc; font-weight: bold; text-align: left; overflow: hidden; }
-                table td { color: #111111; padding: 3px 6px; border-bottom: 1px solid #0066cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                tr.case-header td { background: #f4f6fa; font-weight: bold; color: #111111; border-bottom: 1px solid #0066cc; }
-                tr.subtotal td { background: #e8ecf4; font-weight: bold; color: #111111; border-top: 2px solid #0066cc; border-bottom: 2px solid #0066cc; }
-                tr.grand-total td { background: #e8ecf4; font-weight: bold; color: #111111; border-top: 2px solid #0066cc; border-bottom: 2px solid #0066cc; }
-                .blue-text { color: #0066cc; }
-                tr.rate-55 td { color: #0066cc; }
-                .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
-                .case-col { width: 30px; text-align: center; font-size: 11px; color: #555555; font-weight: normal; }
-                .running-col { display: none; }
-                .section-heading { color: #0066cc; font-weight: bold; font-size: 14px; border-bottom: 2px solid #0066cc; padding-bottom: 4px; margin: 16px 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
-                .invoice-totals-table { table-layout: auto !important; }
-                .invoice-totals-table tbody td:nth-child(2) { border-right: 2px solid #0066cc; }
-                .totals-section { border-top: 2px solid #0066cc; margin-top: 30px; padding-top: 20px; }
-                .totals-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; font-size: 12px; }
-                .total-item { display: flex; justify-content: space-between; padding: 8px; background: #e8ecf4; border: 1px solid #0066cc; color: #111111; font-size: 12px; }
-                [contenteditable] { outline: none; }
-                .vendor-info, .invoice-info, .bill-to-section, .invoice-header { color: #111111; }
-                h1 { color: #0066cc; } h2 { color: #0066cc; } h3 { color: #111111; }
+            // Take the full page stylesheet and swap dark :root vars for light ones.
+            // This preserves all layout rules (column widths, fonts, spacing) while
+            // forcing light colors — no CSS vars in the iframe means no dark bleed-through.
+            const mainStyleEl = document.querySelector('head style');
+            const pageCSS = mainStyleEl ? mainStyleEl.textContent : '';
+            const lightCSS = pageCSS.replace(
+                /:root\s*\{[\s\S]*?\}/,
+                `:root {
+                    --bg: #f4f6fa;
+                    --surface: #ffffff;
+                    --surface2: #e8ecf4;
+                    --border: #0066cc;
+                    --accent: #0066cc;
+                    --accent2: #0066cc;
+                    --text: #111111;
+                    --muted: #555555;
+                }`
+            ) + `
+            /* PDF render overrides */
+            body { background: #f4f6fa !important; color: #111111 !important; width: 816px; margin: 0; }
+            .invoice-container { box-shadow: none !important; max-width: 100% !important; }
+            [contenteditable] { outline: none !important; }
             `;
 
             const htmlDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${lightCSS}</style></head><body>${clone.outerHTML}</body></html>`;
