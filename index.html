@@ -2881,6 +2881,14 @@ ${payload}`;
                 el.style.setProperty('break-inside',      'avoid', 'important');
             });
 
+            // Force light color scheme so computed defaults (text, backgrounds) use light-mode values.
+            // Without this, dark-mode browsers return white as the computed text color for elements
+            // that don't have an explicit color rule, which inlineColors would bake in as white-on-white.
+            offscreen.style.colorScheme = 'light only';
+            clone.style.colorScheme     = 'light only';
+            clone.style.color           = '#111111';   // explicit base text color
+            clone.style.backgroundColor = '#ffffff';
+
             // html2canvas cannot resolve CSS custom properties — set variables then
             // immediately inline all computed colors so html2canvas sees plain RGB values
             clone.style.setProperty('--bg',       '#ffffff');
