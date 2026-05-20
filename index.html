@@ -728,14 +728,14 @@
         function cleanCategory(text) {
             return text
                 .replace(/(investigator service|out of pocket)\s*-\s*/gi, '')
-                .replace(/discovery analysis & evidence review/gi, 'Discovery/Review')
-                .replace(/witness development & interviews/gi, 'Witness Interviews')
-                .replace(/case intake (&|and) file audit/gi, 'Intake & Audit')
+                .replace(/discovery analysis\s*(&|and)\s*evidence review/gi, 'Discovery/Review')
+                .replace(/witness development\s*(&|and)\s*interviews/gi, 'Witness Interviews')
+                .replace(/case intake\s*(&|and)\s*file audit/gi, 'Intake & Audit')
                 .replace(/case intake and audit/gi, 'Intake & Audit')
-                .replace(/tactical field operations & scene documentation/gi, 'Field Ops')
-                .replace(/field ops & scene doc/gi, 'Field Ops')
-                .replace(/intelligence gathering\s*&\s*osint/gi, 'OSINT')
-                .replace(/investigative reporting\s*&\s*documentation/gi, 'Inv. Report / Doc')
+                .replace(/tactical field operations\s*(&|and)\s*scene documentation/gi, 'Field Ops')
+                .replace(/field ops\s*(&|and)\s*scene doc/gi, 'Field Ops')
+                .replace(/intelligence gathering\s*(&|and)\s*osint/gi, 'OSINT')
+                .replace(/investigative reporting\s*(&|and)\s*documentation/gi, 'Inv. Report / Doc')
                 .trim();
         }
 
