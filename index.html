@@ -2879,29 +2879,43 @@ ${payload}`;
                 el.style.setProperty('break-inside',      'avoid', 'important');
             });
 
-            // Override dark :root CSS variables with light-mode values, then inline
-            // all computed colors so html2canvas sees plain RGB (not var() references)
-            clone.style.setProperty('--bg',       '#ffffff');
-            clone.style.setProperty('--surface',  '#f4f6fa');
-            clone.style.setProperty('--surface2', '#e8ecf4');
-            clone.style.setProperty('--border',   '#0066cc');
-            clone.style.setProperty('--text',     '#111111');
-            clone.style.setProperty('--accent',   '#00aa88');
-            clone.style.setProperty('--accent2',  '#0066cc');
-            clone.style.setProperty('--muted',    '#555555');
-
-            (function inlineColors(el) {
-                const cs = window.getComputedStyle(el);
-                const color = cs.color;
-                const bg    = cs.backgroundColor;
-                const btop  = cs.borderTopColor;
-                const bbot  = cs.borderBottomColor;
-                if (color) el.style.color = color;
-                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') el.style.backgroundColor = bg;
-                if (btop) el.style.borderTopColor = btop;
-                if (bbot) el.style.borderBottomColor = bbot;
-                Array.from(el.children).forEach(inlineColors);
-            })(clone);
+            // Force light-mode colors directly as inline styles — bypasses CSS variable
+            // resolution entirely so html2canvas sees plain values regardless of dark :root theme.
+            const B = '#0066cc', T = '#111111', S = '#f4f6fa', S2 = '#e8ecf4', MU = '#555555';
+            clone.style.backgroundColor = S;
+            clone.style.color = T;
+            clone.querySelectorAll('table').forEach(t => { t.style.backgroundColor = '#ffffff'; });
+            clone.querySelectorAll('table thead, table thead tr').forEach(el => { el.style.backgroundColor = S2; });
+            clone.querySelectorAll('table th').forEach(el => {
+                el.style.color = T; el.style.backgroundColor = S2;
+                el.style.borderBottomColor = B; el.style.borderTopColor = B;
+            });
+            clone.querySelectorAll('table td').forEach(el => {
+                el.style.color = T; el.style.borderBottomColor = B;
+            });
+            clone.querySelectorAll('tr.case-header td').forEach(el => {
+                el.style.backgroundColor = S; el.style.color = T; el.style.borderBottomColor = B;
+            });
+            clone.querySelectorAll('tr.subtotal td').forEach(el => {
+                el.style.backgroundColor = S2; el.style.color = T;
+                el.style.borderTopColor = B; el.style.borderBottomColor = B;
+            });
+            clone.querySelectorAll('tr.grand-total td').forEach(el => {
+                el.style.backgroundColor = S2; el.style.color = T;
+                el.style.borderTopColor = B; el.style.borderBottomColor = B;
+            });
+            clone.querySelectorAll('.blue-text, tr.rate-55 td').forEach(el => { el.style.color = B; });
+            clone.querySelectorAll('.case-col, .running-col').forEach(el => { el.style.color = MU; });
+            clone.querySelectorAll('.section-heading').forEach(el => {
+                el.style.color = B; el.style.borderBottomColor = B; el.style.backgroundColor = 'transparent';
+            });
+            clone.querySelectorAll('.totals-section').forEach(el => { el.style.borderTopColor = B; });
+            clone.querySelectorAll('.total-item').forEach(el => {
+                el.style.backgroundColor = S2; el.style.borderColor = B; el.style.color = T;
+            });
+            clone.querySelectorAll('.invoice-totals-table tbody td:nth-child(2)').forEach(el => {
+                el.style.borderRightColor = B;
+            });
 
             try {
                 // Generate PDF as a blob so we can use the save-file picker
