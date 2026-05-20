@@ -2937,7 +2937,6 @@ ${payload}`;
             const invoiceEl = document.querySelector('.invoice-container');
             if (!invoiceEl) return;
 
-            // Build filename: Vendor {vendor_num} PAE {pae_num}.pdf
             const vendorInfo = document.querySelector('.vendor-info');
             const vendorMatch = vendorInfo ? vendorInfo.textContent.match(/Vendor\s*#:\s*([\d-]+)/) : null;
             const vendorNum = vendorMatch ? vendorMatch[1].replace(/-/g, ' ') : 'vendor';
@@ -2945,17 +2944,16 @@ ${payload}`;
             const paeVal = getFieldValue(paeEl);
             const filename = paeVal ? `Invoice Vendor ${vendorNum} PAE ${paeVal}.pdf` : `Invoice Vendor ${vendorNum}.pdf`;
 
-            // Show loading toast
             const ind = document.getElementById('save-indicator');
             const origText = ind.textContent;
             ind.textContent = '⏳ Generating PDF…';
             ind.classList.add('visible');
 
-            // Clone and strip screen-only elements
+            // === EXACT same iframe setup as testPdf (proven working) ===
             const clone = invoiceEl.cloneNode(true);
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
+            clone.style.cssText = 'padding:20px 28px;box-shadow:none;max-width:100%;box-sizing:border-box;overflow:hidden;background:#f4f6fa;';
 
-            // Fix table layouts
             clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
                 t.style.width = '100%';
@@ -2964,7 +2962,6 @@ ${payload}`;
             const cloneTotals = clone.querySelector('.invoice-totals-table');
             if (cloneTotals) cloneTotals.style.tableLayout = 'auto';
 
-            // Fix colspans after print-hide columns removed
             clone.querySelectorAll('table').forEach(table => {
                 const totalCols = table.querySelectorAll('thead tr:first-child th').length;
                 table.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
@@ -2974,7 +2971,6 @@ ${payload}`;
                 });
             });
 
-            // Get full page CSS, swap dark :root vars for light ones
             const mainStyleEl = document.querySelector('head style');
             const pageCSS = mainStyleEl ? mainStyleEl.textContent : '';
             const lightCSS = pageCSS.replace(
@@ -2990,20 +2986,13 @@ ${payload}`;
                     --muted: #555555;
                 }`
             ) + `
-            /* PDF render overrides */
             body { background: #f4f6fa !important; color: #111111 !important; width: 816px; margin: 0; }
             .invoice-container { box-shadow: none !important; max-width: 100% !important; }
             [contenteditable] { outline: none !important; }
-            /* Page break hints */
-            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-            .section-heading { page-break-after: avoid !important; break-after: avoid !important; }
-            .invoice-totals-table, .invoice-totals-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-            .totals-section { page-break-inside: avoid !important; break-inside: avoid !important; }
             `;
 
             const htmlDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${lightCSS}</style></head><body>${clone.outerHTML}</body></html>`;
 
-            // Render in hidden iframe — clean light-mode document, no dark CSS bleed
             const iframe = document.createElement('iframe');
             iframe.style.cssText = 'position:absolute;left:0;top:0;width:816px;height:5000px;border:none;visibility:hidden;';
             document.body.appendChild(iframe);
@@ -3014,37 +3003,18 @@ ${payload}`;
                 iframe.style.height = iframeH + 'px';
                 await new Promise(r => setTimeout(r, 200));
 
-                // Capture iframe with html2canvas (standalone — respects iframe CSS)
+                // Same html2canvas call as testPdf
                 const canvas = await html2canvas(iframe.contentDocument.body, {
-                    scale: 2, useCORS: true, backgroundColor: '#f4f6fa', windowWidth: 816
+                    scale: 1, useCORS: true, backgroundColor: '#ffffff', windowWidth: 816
                 });
 
-                // Build multi-page PDF with jsPDF (bundled inside html2pdf)
-                const jsPDFCtor = window.jspdf?.jsPDF;
-                if (!jsPDFCtor) throw new Error('jsPDF not available — check bundle');
-                const pdf = new jsPDFCtor({ unit: 'in', format: 'letter', orientation: 'portrait' });
-                const margin = 0.4;
-                const pageW = 8.5, pageH = 11;
-                const contentW = pageW - margin * 2; // 7.7in
-                const contentH = pageH - margin * 2; // 10.2in
-                // canvas.width px = pageW inches (816px body = 8.5in at 96dpi, scale:2 = 1632px)
-                const ppi = canvas.width / pageW;
-                const totalH = canvas.height / ppi;
-                let page = 0, yIn = 0;
-                while (yIn < totalH) {
-                    if (page++ > 0) pdf.addPage();
-                    const sliceH = Math.min(contentH, totalH - yIn);
-                    const sc = document.createElement('canvas');
-                    sc.width = canvas.width;
-                    sc.height = Math.ceil(sliceH * ppi);
-                    const ctx = sc.getContext('2d');
-                    ctx.fillStyle = '#f4f6fa';
-                    ctx.fillRect(0, 0, sc.width, sc.height);
-                    ctx.drawImage(canvas, 0, Math.floor(yIn * ppi), canvas.width, sc.height, 0, 0, sc.width, sc.height);
-                    pdf.addImage(sc.toDataURL('image/jpeg', 0.98), 'JPEG', margin, margin, contentW, sliceH);
-                    yIn += contentH;
-                }
-                const pdfBlob = pdf.output('blob');
+                // Convert canvas to PDF using html2pdf (one page per canvas)
+                const pdfBlob = await html2pdf().set({
+                    margin: 0.4,
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                }).from(canvas, 'canvas').output('blob');
 
                 // ── PDF Preview modal ─────────────────────────────────────────
                 ind.textContent = '👁 Preview ready';
