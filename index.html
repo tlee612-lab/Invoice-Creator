@@ -1533,46 +1533,6 @@
             dbgOverlay.appendChild(dbgImg);
             document.body.appendChild(dbgOverlay);
             iframe.remove();
-            return; // stop here — check colors in the canvas image first
-
-            try {
-                const pdfBlob = await html2pdf().set({
-                    margin:      0.4,
-                    filename:    filename,
-                    image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 816 },
-                    jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
-                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
-                }).from(iframe.contentDocument.body).output('blob');
-
-                // Preview modal (same as downloadPdf)
-                const blobUrl = URL.createObjectURL(pdfBlob);
-                const pvOverlay = document.createElement('div');
-                pvOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;box-sizing:border-box';
-                const pvToolbar = document.createElement('div');
-                pvToolbar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;width:100%;max-width:900px';
-                pvToolbar.innerHTML = `<span style="flex:1;font-size:13px;font-weight:700;color:#fff;">📄 TEST PDF — ${filename}</span>
-                    <button id="pvTestSave" style="padding:8px 18px;border-radius:6px;border:none;background:#00aa88;color:#fff;font-weight:700;font-size:13px;cursor:pointer">💾 Save</button>
-                    <button id="pvTestClose" style="padding:8px 14px;border-radius:6px;border:1px solid #888;background:rgba(255,255,255,0.1);color:#fff;font-weight:700;font-size:13px;cursor:pointer">✕ Close</button>`;
-                const pvFrame = document.createElement('iframe');
-                pvFrame.src = blobUrl;
-                pvFrame.style.cssText = 'flex:1;width:100%;max-width:900px;border:none;border-radius:4px;background:#fff;';
-                pvOverlay.appendChild(pvToolbar);
-                pvOverlay.appendChild(pvFrame);
-                document.body.appendChild(pvOverlay);
-                pvToolbar.querySelector('#pvTestClose').onclick = () => { pvOverlay.remove(); URL.revokeObjectURL(blobUrl); };
-                pvToolbar.querySelector('#pvTestSave').onclick = async () => {
-                    if (window.showSaveFilePicker) {
-                        try {
-                            const fh = await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }] });
-                            const w = await fh.createWritable();
-                            await w.write(pdfBlob); await w.close();
-                        } catch(e) { if (e.name !== 'AbortError') _pdfFallbackDownload(pdfBlob, filename); }
-                    } else { _pdfFallbackDownload(pdfBlob, filename); }
-                };
-            } finally {
-                iframe.remove();
-            }
         }
 
         async function validateInvoice() {
