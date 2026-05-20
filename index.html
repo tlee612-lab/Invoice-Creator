@@ -165,7 +165,7 @@
         #table-hours tr.case-header, #table-mileage tr.case-header, #table-expenses tr.case-header { display: none !important; }
         #table-hours tbody tr.subtotal, #table-mileage tbody tr.subtotal, #table-expenses tbody tr.subtotal { display: none !important; }
         .case-col { width: 30px; min-width: 30px; max-width: 30px; text-align: center; font-size: 11px; color: var(--muted, #888); font-weight: normal; }
-        .running-col { width: 60px; text-align: right; font-size: 11px; color: var(--muted, #888); font-style: italic; }
+        .running-col { width: 60px; text-align: right; font-size: 11px; color: var(--muted, #888); font-style: italic; border-bottom: none !important; }
         @media print { .print-hide { display: none !important; } }
         table tr.grand-total td { background: var(--surface2); color: var(--text); font-weight: bold; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); padding: 8px 6px; }
         .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
@@ -2923,7 +2923,24 @@ ${payload}`;
                     margin:      0.4,
                     filename:    filename,
                     image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff',
+                        onclone: function(clonedDoc) {
+                            // Set CSS variables on :root of html2canvas's internal clone.
+                            // This is the only reliable way — html2canvas re-evaluates CSS
+                            // from its own cloned document, ignoring our main-doc changes.
+                            const root = clonedDoc.documentElement;
+                            root.style.setProperty('--bg',      '#ffffff');
+                            root.style.setProperty('--surface', '#f4f6fa');
+                            root.style.setProperty('--surface2','#e8ecf4');
+                            root.style.setProperty('--border',  '#0066cc');
+                            root.style.setProperty('--text',    '#111111');
+                            root.style.setProperty('--accent',  '#00aa88');
+                            root.style.setProperty('--accent2', '#0066cc');
+                            root.style.setProperty('--muted',   '#555555');
+                            clonedDoc.body.style.backgroundColor = '#ffffff';
+                            clonedDoc.body.style.color = '#111111';
+                        }
+                    },
                     jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
                     pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
                 }).from(clone).output('blob');
