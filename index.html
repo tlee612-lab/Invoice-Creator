@@ -2899,7 +2899,15 @@ ${payload}`;
                 const btop  = cs.borderTopColor;
                 const bbot  = cs.borderBottomColor;
                 if (color) el.style.color = color;
-                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && bg !== 'rgb(0, 0, 0)') el.style.backgroundColor = bg;
+                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+                    // Only apply background if it's light enough (brightness > 30/255)
+                    // This prevents dark-mode computed colors or stray black backgrounds
+                    const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (m) {
+                        const brightness = (+m[1] * 299 + +m[2] * 587 + +m[3] * 114) / 1000;
+                        if (brightness > 30) el.style.backgroundColor = bg;
+                    }
+                }
                 if (btop) el.style.borderTopColor = btop;
                 if (bbot) el.style.borderBottomColor = bbot;
                 Array.from(el.children).forEach(inlineColors);
