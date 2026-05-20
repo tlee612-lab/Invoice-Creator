@@ -2949,10 +2949,15 @@ ${payload}`;
             ind.textContent = '⏳ Generating PDF…';
             ind.classList.add('visible');
 
-            // === EXACT same iframe setup as testPdf (proven working) ===
+            // Clone into offscreen div in the main document
+            const offscreen = document.createElement('div');
+            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;';
+            document.body.appendChild(offscreen);
+
             const clone = invoiceEl.cloneNode(true);
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
-            clone.style.cssText = 'padding:20px 28px;box-shadow:none;max-width:100%;box-sizing:border-box;overflow:hidden;background:#f4f6fa;';
+            clone.style.cssText = 'padding:20px 28px;box-shadow:none;max-width:100%;box-sizing:border-box;overflow:hidden;';
+            offscreen.appendChild(clone);
 
             clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
@@ -2971,50 +2976,39 @@ ${payload}`;
                 });
             });
 
-            const mainStyleEl = document.querySelector('head style');
-            const pageCSS = mainStyleEl ? mainStyleEl.textContent : '';
-            const lightCSS = pageCSS.replace(
-                /:root\s*\{[\s\S]*?\}/,
-                `:root {
-                    --bg: #f4f6fa;
-                    --surface: #ffffff;
-                    --surface2: #e8ecf4;
-                    --border: #0066cc;
-                    --accent: #0066cc;
-                    --accent2: #0066cc;
-                    --text: #111111;
-                    --muted: #555555;
-                }`
-            ) + `
-            body { background: #f4f6fa !important; color: #111111 !important; width: 816px; margin: 0; }
-            .invoice-container { box-shadow: none !important; max-width: 100% !important; }
-            [contenteditable] { outline: none !important; }
-            `;
+            // Page-break hints so html2pdf doesn't cut mid-row
+            clone.querySelectorAll('tr').forEach(el => {
+                el.style.setProperty('page-break-inside', 'avoid', 'important');
+                el.style.setProperty('break-inside', 'avoid', 'important');
+            });
+            clone.querySelectorAll('.section-heading').forEach(el => {
+                el.style.setProperty('page-break-after', 'avoid', 'important');
+                el.style.setProperty('break-after', 'avoid', 'important');
+            });
+            clone.querySelectorAll('.invoice-totals-table, .totals-section').forEach(el => {
+                el.style.setProperty('page-break-inside', 'avoid', 'important');
+                el.style.setProperty('break-inside', 'avoid', 'important');
+            });
 
-            const htmlDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${lightCSS}</style></head><body>${clone.outerHTML}</body></html>`;
-
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:absolute;left:0;top:0;width:816px;height:5000px;border:none;visibility:hidden;';
-            document.body.appendChild(iframe);
+            // Override :root CSS variables with light values via inline style on <html>.
+            // Inline styles have higher priority than stylesheet rules for custom properties,
+            // so html2canvas reads the correct light computed values.
+            const lightVars = {
+                '--bg': '#f4f6fa', '--surface': '#ffffff', '--surface2': '#e8ecf4',
+                '--border': '#0066cc', '--accent': '#0066cc', '--accent2': '#0066cc',
+                '--text': '#111111', '--muted': '#555555'
+            };
+            Object.entries(lightVars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
 
             try {
-                await new Promise(r => { iframe.onload = r; iframe.srcdoc = htmlDoc; });
-                const iframeH = Math.max(iframe.contentDocument.body.scrollHeight, 1100);
-                iframe.style.height = iframeH + 'px';
-                await new Promise(r => setTimeout(r, 200));
-
-                // Same html2canvas call as testPdf
-                const canvas = await html2canvas(iframe.contentDocument.body, {
-                    scale: 1, useCORS: true, backgroundColor: '#ffffff', windowWidth: 816
-                });
-
-                // Convert canvas to PDF using html2pdf (one page per canvas)
                 const pdfBlob = await html2pdf().set({
-                    margin: 0.4,
-                    filename: filename,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                }).from(canvas, 'canvas').output('blob');
+                    margin:      0.4,
+                    filename:    filename,
+                    image:       { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#f4f6fa' },
+                    jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
+                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table', '.totals-section'] }
+                }).from(clone).output('blob');
 
                 // ── PDF Preview modal ─────────────────────────────────────────
                 ind.textContent = '👁 Preview ready';
@@ -3082,7 +3076,8 @@ ${payload}`;
                     ind.classList.remove('visible');
                 }, 4000);
             } finally {
-                iframe.remove();
+                offscreen.remove();
+                Object.keys(lightVars).forEach(k => document.documentElement.style.removeProperty(k));
             }
         }
 
