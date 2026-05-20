@@ -2925,24 +2925,33 @@ ${payload}`;
                     image:       { type: 'jpeg', quality: 0.98 },
                     html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff',
                         onclone: function(clonedDoc) {
-                            // Remove the dark <style> block entirely so it can't override anything
+                            // Remove the dark stylesheet so it cannot override anything
                             clonedDoc.querySelectorAll('style').forEach(s => s.remove());
-                            // Inject a clean light-mode stylesheet — inline styles on elements
-                            // (set above) handle specifics; this provides the base layer
+                            // Force light color-scheme on the root element
+                            clonedDoc.documentElement.style.colorScheme = 'only light';
+                            // Inject a clean light-mode stylesheet
                             const s = clonedDoc.createElement('style');
                             s.textContent = `
-                                * { box-sizing: border-box; }
-                                body { background:#fff; color:#111111; font-family:Barlow,Arial,sans-serif; }
+                                html, body { color-scheme: only light; }
+                                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+                                body { background:#ffffff; color:#111111; font-family:Barlow,Arial,sans-serif; }
                                 table { border-collapse:collapse; width:100%; }
-                                table th { font-weight:bold; text-align:left; }
+                                table th { font-weight:bold; text-align:left; padding:5px 6px; background:#e8ecf4; color:#111111; border-bottom:1px solid #0066cc; }
+                                table td { padding:3px 6px; color:#111111; border-bottom:1px solid #0066cc; white-space:nowrap; }
+                                table thead { background:#e8ecf4; }
+                                tr.case-header td { background:#f4f6fa; font-weight:bold; color:#111111; }
+                                tr.subtotal td { background:#e8ecf4; font-weight:bold; color:#111111; border-top:2px solid #0066cc; border-bottom:2px solid #0066cc; }
+                                tr.grand-total td { background:#e8ecf4; font-weight:bold; color:#111111; border-top:2px solid #0066cc; border-bottom:2px solid #0066cc; }
                                 .blue-text, tr.rate-55 td { color:#0066cc !important; }
-                                .section-heading { color:#0066cc; font-weight:bold; border-bottom:2px solid #0066cc; }
-                                .hours-col,.miles-col,.amount-col { text-align:right; }
-                                .case-col,.running-col { font-size:11px; color:#555555; }
-                                .running-col { border-bottom:none !important; }
+                                .hours-col,.miles-col,.amount-col { text-align:right; width:80px; }
+                                .case-col { width:30px; text-align:center; font-size:11px; color:#555555; font-weight:normal; }
+                                .running-col { width:60px; text-align:right; font-size:11px; color:#555555; font-style:italic; border-bottom:none !important; }
+                                .section-heading { color:#0066cc; font-weight:bold; font-size:14px; border-bottom:2px solid #0066cc; padding-bottom:4px; margin-bottom:8px; }
+                                .invoice-totals-table { table-layout:auto; }
                                 .invoice-totals-table tbody td:nth-child(2) { border-right:2px solid #0066cc; }
                                 .totals-section { border-top:2px solid #0066cc; margin-top:30px; padding-top:20px; }
-                                .total-item { display:flex; justify-content:space-between; padding:8px; background:#e8ecf4; border:1px solid #0066cc; color:#111111; }
+                                .total-item { display:flex; justify-content:space-between; padding:8px; background:#e8ecf4; border:1px solid #0066cc; color:#111111; font-size:12px; }
+                                .invoice-container { background:#f4f6fa; }
                             `;
                             clonedDoc.head.appendChild(s);
                         }
