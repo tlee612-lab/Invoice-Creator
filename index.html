@@ -1420,9 +1420,121 @@
             // Validation: check for errors, missing fields, rate mistakes, duplicates, etc.
         }
 
-        function testPdf() {
-            // Test button — wire up as needed
-            console.log('Test button clicked');
+        async function testPdf() {
+            const invoiceEl = document.querySelector('.invoice-container');
+            if (!invoiceEl) return;
+
+            // Build filename same as downloadPdf
+            const vendorInfo = document.querySelector('.vendor-info');
+            const vendorMatch = vendorInfo ? vendorInfo.textContent.match(/Vendor\s*#:\s*([\d-]+)/) : null;
+            const vendorNum = vendorMatch ? vendorMatch[1].replace(/-/g, ' ') : 'vendor';
+            const paeEl = document.getElementById('field-pae');
+            const paeVal = getFieldValue(paeEl);
+            const filename = paeVal ? `Invoice Vendor ${vendorNum} PAE ${paeVal}.pdf` : `Invoice Vendor ${vendorNum}.pdf`;
+
+            // Clone and strip screen-only elements
+            const clone = invoiceEl.cloneNode(true);
+            clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
+            clone.style.cssText = 'padding:20px 28px;box-shadow:none;max-width:100%;box-sizing:border-box;overflow:hidden;background:#f4f6fa;';
+
+            // Fix table layouts
+            clone.querySelectorAll('table').forEach(t => {
+                t.style.tableLayout = 'fixed';
+                t.style.width = '100%';
+                t.style.boxSizing = 'border-box';
+            });
+            const totalsTable = clone.querySelector('.invoice-totals-table');
+            if (totalsTable) totalsTable.style.tableLayout = 'auto';
+
+            // Fix colspans after print-hide columns removed
+            clone.querySelectorAll('table').forEach(table => {
+                const totalCols = table.querySelectorAll('thead tr:first-child th').length;
+                table.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
+                    const cells = Array.from(tr.cells);
+                    if (cells.length < 2) return;
+                    cells[0].colSpan = totalCols - (cells.length - 1);
+                });
+            });
+
+            // Build a self-contained HTML document with only light-mode CSS — no variables
+            const lightCSS = `
+                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+                body { background: #ffffff; color: #111111; font-family: Arial, Helvetica, sans-serif; width: 816px; }
+                .invoice-container { background: #f4f6fa; padding: 20px 28px; }
+                table { border-collapse: collapse; width: 100%; }
+                table thead, table thead tr { background: #e8ecf4; }
+                table th { color: #111111; background: #e8ecf4; padding: 5px 6px; border-bottom: 1px solid #0066cc; font-weight: bold; text-align: left; overflow: hidden; }
+                table td { color: #111111; padding: 3px 6px; border-bottom: 1px solid #0066cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                tr.case-header td { background: #f4f6fa; font-weight: bold; color: #111111; border-bottom: 1px solid #0066cc; }
+                tr.subtotal td { background: #e8ecf4; font-weight: bold; color: #111111; border-top: 2px solid #0066cc; border-bottom: 2px solid #0066cc; }
+                tr.grand-total td { background: #e8ecf4; font-weight: bold; color: #111111; border-top: 2px solid #0066cc; border-bottom: 2px solid #0066cc; }
+                .blue-text { color: #0066cc; }
+                tr.rate-55 td { color: #0066cc; }
+                .hours-col, .miles-col, .amount-col { text-align: right; width: 80px; }
+                .case-col { width: 30px; text-align: center; font-size: 11px; color: #555555; font-weight: normal; }
+                .running-col { display: none; }
+                .section-heading { color: #0066cc; font-weight: bold; font-size: 14px; border-bottom: 2px solid #0066cc; padding-bottom: 4px; margin: 16px 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+                .invoice-totals-table { table-layout: auto !important; }
+                .invoice-totals-table tbody td:nth-child(2) { border-right: 2px solid #0066cc; }
+                .totals-section { border-top: 2px solid #0066cc; margin-top: 30px; padding-top: 20px; }
+                .totals-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; font-size: 12px; }
+                .total-item { display: flex; justify-content: space-between; padding: 8px; background: #e8ecf4; border: 1px solid #0066cc; color: #111111; font-size: 12px; }
+                [contenteditable] { outline: none; }
+                .vendor-info, .invoice-info, .bill-to-section, .invoice-header { color: #111111; }
+                h1 { color: #0066cc; } h2 { color: #0066cc; } h3 { color: #111111; }
+            `;
+
+            const htmlDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${lightCSS}</style></head><body>${clone.outerHTML}</body></html>`;
+
+            // Write into a hidden iframe so html2canvas renders a clean light-mode document
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:1100px;border:none;';
+            document.body.appendChild(iframe);
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(htmlDoc);
+            iframe.contentDocument.close();
+
+            // Wait for iframe to render
+            await new Promise(r => setTimeout(r, 300));
+
+            try {
+                const pdfBlob = await html2pdf().set({
+                    margin:      0.4,
+                    filename:    filename,
+                    image:       { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 816 },
+                    jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
+                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
+                }).from(iframe.contentDocument.body).output('blob');
+
+                // Preview modal (same as downloadPdf)
+                const blobUrl = URL.createObjectURL(pdfBlob);
+                const pvOverlay = document.createElement('div');
+                pvOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;box-sizing:border-box';
+                const pvToolbar = document.createElement('div');
+                pvToolbar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;width:100%;max-width:900px';
+                pvToolbar.innerHTML = `<span style="flex:1;font-size:13px;font-weight:700;color:#fff;">📄 TEST PDF — ${filename}</span>
+                    <button id="pvTestSave" style="padding:8px 18px;border-radius:6px;border:none;background:#00aa88;color:#fff;font-weight:700;font-size:13px;cursor:pointer">💾 Save</button>
+                    <button id="pvTestClose" style="padding:8px 14px;border-radius:6px;border:1px solid #888;background:rgba(255,255,255,0.1);color:#fff;font-weight:700;font-size:13px;cursor:pointer">✕ Close</button>`;
+                const pvFrame = document.createElement('iframe');
+                pvFrame.src = blobUrl;
+                pvFrame.style.cssText = 'flex:1;width:100%;max-width:900px;border:none;border-radius:4px;background:#fff;';
+                pvOverlay.appendChild(pvToolbar);
+                pvOverlay.appendChild(pvFrame);
+                document.body.appendChild(pvOverlay);
+                pvToolbar.querySelector('#pvTestClose').onclick = () => { pvOverlay.remove(); URL.revokeObjectURL(blobUrl); };
+                pvToolbar.querySelector('#pvTestSave').onclick = async () => {
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const fh = await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }] });
+                            const w = await fh.createWritable();
+                            await w.write(pdfBlob); await w.close();
+                        } catch(e) { if (e.name !== 'AbortError') _pdfFallbackDownload(pdfBlob, filename); }
+                    } else { _pdfFallbackDownload(pdfBlob, filename); }
+                };
+            } finally {
+                iframe.remove();
+            }
         }
 
         async function validateInvoice() {
