@@ -1939,6 +1939,7 @@ If nothing to fix: []`;
                     });
                 });
             }
+            updateInvoiceTotals();
         }
 
         function switchTab(tabId) {
@@ -2227,7 +2228,6 @@ If nothing to fix: []`;
             if (displayEl) {
                 displayEl.textContent = CONFIG.AI_MODEL ? `Active: ${CONFIG.AI_MODEL}` : '';
             }
-            updateInvoiceTotals();
             updateAIButtonState();
         }
 
@@ -3695,6 +3695,7 @@ ${payload}`;
                 if (file) {
                     const text = await file.text();
                     applyInvoiceState(JSON.parse(text));
+                    await new Promise(r => setTimeout(r, 50)); // let DOM settle
                     saveInvoiceData();
                     e.target.value = ''; // Reset input
                 }
