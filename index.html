@@ -1488,23 +1488,31 @@
 
             // Write into a hidden iframe so html2canvas renders a clean light-mode document
             const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;left:0;top:0;width:816px;height:5000px;border:none;opacity:0;pointer-events:none;z-index:-1;';
+            iframe.style.cssText = 'position:absolute;left:0;top:0;width:816px;height:5000px;border:none;visibility:hidden;';
             document.body.appendChild(iframe);
+            await new Promise(r => { iframe.onload = r; });
             iframe.contentDocument.open();
             iframe.contentDocument.write(htmlDoc);
             iframe.contentDocument.close();
 
             // Wait for iframe to render then size to content
-            await new Promise(r => setTimeout(r, 400));
-            const contentH = iframe.contentDocument.body.scrollHeight;
-            iframe.style.height = Math.max(contentH, 1100) + 'px';
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise(r => setTimeout(r, 500));
+            const contentH = Math.max(iframe.contentDocument.body.scrollHeight, 1100);
+            iframe.style.height = contentH + 'px';
+            await new Promise(r => setTimeout(r, 200));
 
-            // Capture raw canvas first — shows exactly what html2canvas sees
-            const testCanvas = await html2canvas(iframe.contentDocument.body, {
-                scale: 1, useCORS: true, backgroundColor: '#ffffff',
-                windowWidth: 816, width: 816, height: contentH
-            });
+            // Capture raw canvas
+            let testCanvas;
+            try {
+                testCanvas = await html2canvas(iframe.contentDocument.body, {
+                    scale: 1, useCORS: true, backgroundColor: '#ffffff',
+                    windowWidth: 816
+                });
+            } catch(err) {
+                alert('html2canvas error: ' + err.message);
+                iframe.remove();
+                return;
+            }
 
             // Show canvas as image in an overlay so we can see if colors are right
             const dbgOverlay = document.createElement('div');
