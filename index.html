@@ -740,22 +740,18 @@
 
 
         function normalizeCategoryText() {
-            // Hours table: category is column index 2 (0=date, 1=case, 2=category)
-            document.querySelectorAll('#table-hours tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
-                const cell = tr.cells[2];
-                if (!cell) return;
-                const original = cell.textContent;
-                const cleaned = cleanCategory(original);
-                if (cleaned !== original) cell.textContent = cleaned;
-            });
-            // Expenses table: category is column index 2 (0=date, 1=case, 2=category)
-            document.querySelectorAll('#table-expenses tbody tr:not(.case-header):not(.subtotal)').forEach(tr => {
-                const cell = tr.cells[2];
-                if (!cell) return;
-                const original = cell.textContent;
-                const cleaned = cleanCategory(original);
-                if (cleaned !== original) cell.textContent = cleaned;
-            });
+            const fix = (selector) => {
+                document.querySelectorAll(selector).forEach(tr => {
+                    const cell = tr.cells[2];
+                    if (!cell) return;
+                    const original = cell.textContent.trim();
+                    const cleaned = cleanCategory(original);
+                    console.log('[normCat]', JSON.stringify(original), '->', JSON.stringify(cleaned));
+                    cell.textContent = cleaned;
+                });
+            };
+            fix('#table-hours tbody tr:not(.case-header):not(.subtotal)');
+            fix('#table-expenses tbody tr:not(.case-header):not(.subtotal)');
         }
 
         function sortTableByDate(tableId) {
