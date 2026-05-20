@@ -2924,24 +2924,27 @@ ${payload}`;
                     filename:    filename,
                     image:       { type: 'jpeg', quality: 0.98 },
                     html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff',
-                        onclone: function(clonedDoc, clonedEl) {
-                            const LV = { '--bg':'#ffffff','--surface':'#f4f6fa','--surface2':'#e8ecf4',
-                                         '--border':'#0066cc','--text':'#111111','--accent':'#00aa88',
-                                         '--accent2':'#0066cc','--muted':'#555555' };
-                            // 1. Patch :root rule directly in the cloned stylesheet
-                            Array.from(clonedDoc.styleSheets).forEach(sheet => {
-                                try {
-                                    Array.from(sheet.cssRules || []).forEach(rule => {
-                                        if (rule.selectorText === ':root') {
-                                            Object.entries(LV).forEach(([k,v]) => rule.style.setProperty(k, v));
-                                        }
-                                    });
-                                } catch(e) {}
-                            });
-                            // 2. Also set on <html> element inline style (belt + suspenders)
-                            Object.entries(LV).forEach(([k,v]) => clonedDoc.documentElement.style.setProperty(k, v));
-                            clonedDoc.body.style.backgroundColor = '#ffffff';
-                            clonedDoc.body.style.color = '#111111';
+                        onclone: function(clonedDoc) {
+                            // Remove the dark <style> block entirely so it can't override anything
+                            clonedDoc.querySelectorAll('style').forEach(s => s.remove());
+                            // Inject a clean light-mode stylesheet — inline styles on elements
+                            // (set above) handle specifics; this provides the base layer
+                            const s = clonedDoc.createElement('style');
+                            s.textContent = `
+                                * { box-sizing: border-box; }
+                                body { background:#fff; color:#111111; font-family:Barlow,Arial,sans-serif; }
+                                table { border-collapse:collapse; width:100%; }
+                                table th { font-weight:bold; text-align:left; }
+                                .blue-text, tr.rate-55 td { color:#0066cc !important; }
+                                .section-heading { color:#0066cc; font-weight:bold; border-bottom:2px solid #0066cc; }
+                                .hours-col,.miles-col,.amount-col { text-align:right; }
+                                .case-col,.running-col { font-size:11px; color:#555555; }
+                                .running-col { border-bottom:none !important; }
+                                .invoice-totals-table tbody td:nth-child(2) { border-right:2px solid #0066cc; }
+                                .totals-section { border-top:2px solid #0066cc; margin-top:30px; padding-top:20px; }
+                                .total-item { display:flex; justify-content:space-between; padding:8px; background:#e8ecf4; border:1px solid #0066cc; color:#111111; }
+                            `;
+                            clonedDoc.head.appendChild(s);
                         }
                     },
                     jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
