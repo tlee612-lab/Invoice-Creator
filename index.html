@@ -1518,15 +1518,40 @@
             // Show canvas as image in an overlay so we can see if colors are right
             const dbgOverlay = document.createElement('div');
             dbgOverlay.style.cssText = 'position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,0.85);overflow:auto;padding:20px;box-sizing:border-box;';
-            const dbgImg = document.createElement('img');
-            dbgImg.src = testCanvas.toDataURL('image/png');
-            dbgImg.style.cssText = 'max-width:100%;display:block;margin:0 auto;border:2px solid #0f0;';
+
             const dbgClose = document.createElement('button');
             dbgClose.textContent = '✕ Close';
             dbgClose.style.cssText = 'display:block;margin:0 auto 12px;padding:8px 20px;background:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer;';
             dbgClose.onclick = () => dbgOverlay.remove();
+
+            // Wrap image + page-break overlays in a relative container
+            const dbgWrap = document.createElement('div');
+            dbgWrap.style.cssText = 'position:relative;max-width:816px;margin:0 auto;';
+
+            const dbgImg = document.createElement('img');
+            dbgImg.src = testCanvas.toDataURL('image/png');
+            dbgImg.style.cssText = 'width:100%;display:block;border:2px solid #0f0;';
+            dbgWrap.appendChild(dbgImg);
+
+            // Overlay dashed page-break lines.
+            // Letter page = 11in, margins 0.4in top+bottom → content height = 10.2in.
+            // At 96dpi scale:1 → 979px of canvas per page. Show lines every 979px.
+            const pageContentPx = Math.round((11 - 0.4 - 0.4) * 96); // 979
+            const canvasH = testCanvas.height;
+            for (let y = pageContentPx; y < canvasH; y += pageContentPx) {
+                // Scale line position to match the displayed image width vs canvas width
+                const pct = (y / canvasH * 100).toFixed(4);
+                const line = document.createElement('div');
+                line.style.cssText = `position:absolute;left:0;right:0;top:${pct}%;height:0;border-top:2px dashed red;pointer-events:none;`;
+                const label = document.createElement('span');
+                label.textContent = `— page break —`;
+                label.style.cssText = 'position:absolute;right:4px;top:-16px;background:red;color:#fff;font-size:10px;font-weight:bold;padding:1px 4px;border-radius:2px;';
+                line.appendChild(label);
+                dbgWrap.appendChild(line);
+            }
+
             dbgOverlay.appendChild(dbgClose);
-            dbgOverlay.appendChild(dbgImg);
+            dbgOverlay.appendChild(dbgWrap);
             document.body.appendChild(dbgOverlay);
             iframe.remove();
         }
