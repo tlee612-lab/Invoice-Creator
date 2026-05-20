@@ -156,7 +156,10 @@
         .client-section, .invoice-details { flex: 1; }
         .section-title { font-size: 12px; font-weight: bold; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
         .client-info { font-size: 12px; color: var(--text); line-height: 1.6; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 12px; table-layout: fixed; }
+        #table-hours td:nth-child(3), #table-hours td:nth-child(4),
+        #table-mileage td:nth-child(3),
+        #table-expenses td:nth-child(4) { white-space: normal; word-break: break-word; }
         .section-heading { font-size: 13px; font-weight: bold; background: var(--surface2); padding: 8px 8px 4px 8px; margin-top: 5px; margin-bottom: 0; color: var(--text); }
         table thead { background: var(--surface2); }
         table th { padding: 8px 6px; text-align: left; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--text); }
@@ -204,19 +207,19 @@
         <textarea id="paste-area" placeholder="Paste spreadsheet data or drop a PAE..."></textarea>
         <!-- Row 1: Data -->
         <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
-            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 PAE File</button>
-            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Box</button>
-            <button onclick="importFromPasteArea()" title="Import data from the paste box" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📋 Import</button>
+            <button onclick="document.getElementById('pdf-input').click()" title="Scan PDF for PAE info" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📄 Load PAE</button>
+            <button onclick="document.getElementById('paste-area').value = '';" title="Clear the paste area" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear Input</button>
+            <button onclick="importFromPasteArea()" title="Import data from the paste box" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📋 Import Data</button>
             <label for="json-input" title="Load a saved invoice JSON file" tabindex="0" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box; display: inline-block; text-align: center; margin: 0;">📂 Load Invoice</label>
             <button onclick="exportToJson()" title="Export invoice to JSON file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">💾 Save Invoice</button>
-            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ Clear All</button>
+            <button onclick="resetForm()" title="Clear entire invoice and start over" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🗑️ New Invoice</button>
         </div>
         <!-- Row 2: Output / Tools -->
         <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 5px; align-items: center;">
             <button onclick="window.print()" title="Print invoice using browser print" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🖨️ Print</button>
             <button onclick="downloadPdf()" title="Download invoice as PDF file" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">📥 PDF</button>
             <button id="btn-convert-names" onclick="convertNamesToCodes()" title="Convert names to anonymized codes" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🏷️ Anonymize</button>
-            <button onclick="spellCheckInvoice()" title="AI spell check all descriptions" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🔤 Spell</button>
+            <button onclick="spellCheckInvoice()" title="AI spell check all descriptions" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">🔤 Spell Check</button>
             <button id="btn-validate" onclick="validateInvoice()" title="Run AI validation audit" style="padding: 6px 8px; cursor: pointer; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; font-weight: bold; width: 100%; box-sizing: border-box;">✅ Validate</button>
         </div>
         <button id="btn-test" onclick="testPdf()" title="Test" style="display:none;">🧪 Test</button>
