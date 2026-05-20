@@ -1488,7 +1488,7 @@
 
             // Write into a hidden iframe so html2canvas renders a clean light-mode document
             const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:5000px;border:none;';
+            iframe.style.cssText = 'position:fixed;left:0;top:0;width:816px;height:5000px;border:none;opacity:0;pointer-events:none;z-index:-1;';
             document.body.appendChild(iframe);
             iframe.contentDocument.open();
             iframe.contentDocument.write(htmlDoc);
