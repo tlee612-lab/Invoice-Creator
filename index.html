@@ -1945,6 +1945,7 @@ If nothing to fix: []`;
                 });
             }
             normalizeCategoryText();
+            ['table-hours', 'table-mileage', 'table-expenses'].forEach(id => sortTableByDate(id));
             updateInvoiceTotals();
         }
 
