@@ -2951,50 +2951,20 @@ ${payload}`;
             ind.textContent = '⏳ Generating PDF…';
             ind.classList.add('visible');
 
-            // Put offscreen container in the document FIRST so CSS class styles resolve
-            const offscreen = document.createElement('div');
-            offscreen.style.cssText = 'position:absolute;left:-9999px;top:0;width:816px;overflow:hidden;background:#fff';
-            document.body.appendChild(offscreen);
-
-            // Clone into live document so getComputedStyle works correctly
+            // Clone and strip screen-only elements
             const clone = invoiceEl.cloneNode(true);
-            offscreen.appendChild(clone);
-
-            // Remove screen-only elements
             clone.querySelectorAll('.add-row-btn, .print-hide, #row-action-bar').forEach(el => el.remove());
 
-            // Container: tighten padding, remove shadow
-            clone.style.padding    = '20px 28px';
-            clone.style.boxShadow  = 'none';
-            clone.style.maxWidth   = '100%';
-            clone.style.boxSizing  = 'border-box';
-            clone.style.overflow   = 'hidden';
-
-            // Tables: fixed layout so th widths control columns; clip cell overflow
+            // Fix table layouts
             clone.querySelectorAll('table').forEach(t => {
                 t.style.tableLayout = 'fixed';
-                t.style.width       = '100%';
-                t.style.maxWidth    = '100%';
-                t.style.boxSizing   = 'border-box';
+                t.style.width = '100%';
+                t.style.boxSizing = 'border-box';
             });
-            // Invoice totals table only: auto layout so description text isn't clipped
             const cloneTotals = clone.querySelector('.invoice-totals-table');
-            if (cloneTotals) {
-                cloneTotals.style.tableLayout = 'auto';
-            }
-            // Cells: clip content; tighten padding (computed styles valid since clone is in DOM)
-            clone.querySelectorAll('td, th').forEach(cell => {
-                cell.style.overflow      = 'hidden';
-                cell.style.textOverflow  = 'ellipsis';
-                cell.style.boxSizing     = 'border-box';
-                const cs = window.getComputedStyle(cell);
-                const pt = parseFloat(cs.paddingTop)    || 0;
-                const pb = parseFloat(cs.paddingBottom) || 0;
-                cell.style.paddingTop    = Math.max(2, pt - 3) + 'px';
-                cell.style.paddingBottom = Math.max(2, pb - 3) + 'px';
-            });
+            if (cloneTotals) cloneTotals.style.tableLayout = 'auto';
 
-            // Fix colspans in subtotal/footer rows after print-hide columns removed
+            // Fix colspans after print-hide columns removed
             clone.querySelectorAll('table').forEach(table => {
                 const totalCols = table.querySelectorAll('thead tr:first-child th').length;
                 table.querySelectorAll('tfoot tr, tbody tr.subtotal').forEach(tr => {
@@ -3004,52 +2974,55 @@ ${payload}`;
                 });
             });
 
-            // Page-break hints
-            clone.querySelectorAll('tr, .subtotal, .case-header').forEach(el => {
-                el.style.setProperty('page-break-inside', 'avoid', 'important');
-                el.style.setProperty('break-inside',      'avoid', 'important');
-            });
-            clone.querySelectorAll('.section-heading').forEach(el => {
-                el.style.setProperty('page-break-after', 'avoid', 'important');
-                el.style.setProperty('break-after',      'avoid', 'important');
-            });
-            clone.querySelectorAll('.invoice-totals-table, .invoice-totals-table tr').forEach(el => {
-                el.style.setProperty('page-break-inside', 'avoid', 'important');
-                el.style.setProperty('break-inside',      'avoid', 'important');
-            });
-
-            // Inject a light-mode override into the MAIN document before rendering.
-            // html2canvas reads computed styles from the live document — this is the
-            // only reliable way to override the dark :root CSS variables.
-            const pdfLightStyle = document.createElement('style');
-            pdfLightStyle.textContent = `
-                .invoice-container                        { background:#f4f6fa !important; color:#111111 !important; }
-                .invoice-container table                  { background:#ffffff !important; }
-                .invoice-container table thead            { background:#e8ecf4 !important; }
-                .invoice-container table th               { color:#111111 !important; background:#e8ecf4 !important; border-color:#0066cc !important; }
-                .invoice-container table td               { color:#111111 !important; border-bottom-color:#0066cc !important; }
-                .invoice-container tr.case-header td      { background:#f4f6fa !important; color:#111111 !important; }
-                .invoice-container tr.subtotal td         { background:#e8ecf4 !important; color:#111111 !important; border-color:#0066cc !important; }
-                .invoice-container tr.grand-total td      { background:#e8ecf4 !important; color:#111111 !important; border-color:#0066cc !important; }
-                .invoice-container .blue-text             { color:#0066cc !important; }
-                .invoice-container tr.rate-55 td          { color:#0066cc !important; }
-                .invoice-container .section-heading       { color:#0066cc !important; border-color:#0066cc !important; background:transparent !important; }
-                .invoice-container .totals-section        { border-top-color:#0066cc !important; }
-                .invoice-container .total-item            { background:#e8ecf4 !important; color:#111111 !important; border-color:#0066cc !important; }
-                .invoice-container .invoice-totals-table tbody td:nth-child(2) { border-right-color:#0066cc !important; }
+            // Get full page CSS, swap dark :root vars for light ones
+            const mainStyleEl = document.querySelector('head style');
+            const pageCSS = mainStyleEl ? mainStyleEl.textContent : '';
+            const lightCSS = pageCSS.replace(
+                /:root\s*\{[\s\S]*?\}/,
+                `:root {
+                    --bg: #f4f6fa;
+                    --surface: #ffffff;
+                    --surface2: #e8ecf4;
+                    --border: #0066cc;
+                    --accent: #0066cc;
+                    --accent2: #0066cc;
+                    --text: #111111;
+                    --muted: #555555;
+                }`
+            ) + `
+            /* PDF render overrides */
+            body { background: #f4f6fa !important; color: #111111 !important; width: 816px; margin: 0; }
+            .invoice-container { box-shadow: none !important; max-width: 100% !important; }
+            [contenteditable] { outline: none !important; }
+            /* Page break hints */
+            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+            .section-heading { page-break-after: avoid !important; break-after: avoid !important; }
+            .invoice-totals-table, .invoice-totals-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+            .totals-section { page-break-inside: avoid !important; break-inside: avoid !important; }
             `;
-            document.head.appendChild(pdfLightStyle);
+
+            const htmlDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${lightCSS}</style></head><body>${clone.outerHTML}</body></html>`;
+
+            // Render in hidden iframe — clean light-mode document, no dark CSS bleed
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'position:absolute;left:0;top:0;width:816px;height:5000px;border:none;visibility:hidden;';
+            document.body.appendChild(iframe);
 
             try {
-                // Generate PDF as a blob so we can use the save-file picker
+                await new Promise(r => { iframe.onload = r; iframe.srcdoc = htmlDoc; });
+                const contentH = Math.max(iframe.contentDocument.body.scrollHeight, 1100);
+                iframe.style.height = contentH + 'px';
+                await new Promise(r => setTimeout(r, 200));
+
+                // Generate PDF from iframe body
                 const pdfBlob = await html2pdf().set({
                     margin:      0.4,
                     filename:    filename,
                     image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#f4f6fa', windowWidth: 816 },
                     jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
-                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table'] }
-                }).from(clone).output('blob');
+                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table', '.totals-section'] }
+                }).from(iframe.contentDocument.body).output('blob');
 
                 // ── PDF Preview modal ─────────────────────────────────────────
                 ind.textContent = '👁 Preview ready';
@@ -3117,8 +3090,7 @@ ${payload}`;
                     ind.classList.remove('visible');
                 }, 4000);
             } finally {
-                offscreen.remove();
-                pdfLightStyle.remove();
+                iframe.remove();
             }
         }
 
