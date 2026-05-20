@@ -2924,19 +2924,22 @@ ${payload}`;
                     filename:    filename,
                     image:       { type: 'jpeg', quality: 0.98 },
                     html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff',
-                        onclone: function(clonedDoc) {
-                            // Set CSS variables on :root of html2canvas's internal clone.
-                            // This is the only reliable way — html2canvas re-evaluates CSS
-                            // from its own cloned document, ignoring our main-doc changes.
-                            const root = clonedDoc.documentElement;
-                            root.style.setProperty('--bg',      '#ffffff');
-                            root.style.setProperty('--surface', '#f4f6fa');
-                            root.style.setProperty('--surface2','#e8ecf4');
-                            root.style.setProperty('--border',  '#0066cc');
-                            root.style.setProperty('--text',    '#111111');
-                            root.style.setProperty('--accent',  '#00aa88');
-                            root.style.setProperty('--accent2', '#0066cc');
-                            root.style.setProperty('--muted',   '#555555');
+                        onclone: function(clonedDoc, clonedEl) {
+                            const LV = { '--bg':'#ffffff','--surface':'#f4f6fa','--surface2':'#e8ecf4',
+                                         '--border':'#0066cc','--text':'#111111','--accent':'#00aa88',
+                                         '--accent2':'#0066cc','--muted':'#555555' };
+                            // 1. Patch :root rule directly in the cloned stylesheet
+                            Array.from(clonedDoc.styleSheets).forEach(sheet => {
+                                try {
+                                    Array.from(sheet.cssRules || []).forEach(rule => {
+                                        if (rule.selectorText === ':root') {
+                                            Object.entries(LV).forEach(([k,v]) => rule.style.setProperty(k, v));
+                                        }
+                                    });
+                                } catch(e) {}
+                            });
+                            // 2. Also set on <html> element inline style (belt + suspenders)
+                            Object.entries(LV).forEach(([k,v]) => clonedDoc.documentElement.style.setProperty(k, v));
                             clonedDoc.body.style.backgroundColor = '#ffffff';
                             clonedDoc.body.style.color = '#111111';
                         }
