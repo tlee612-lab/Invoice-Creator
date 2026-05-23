@@ -1052,7 +1052,7 @@
             } else {
                 allMileRatesSorted.forEach(rate => {
                     const mi = milesByRate.get(rate) || 0;
-                    const amt = mi * rate;
+                    const amt = Math.round(mi * rate * 100) / 100;
                     grandTotal += amt;
                     rows.push(`<tr>
                         <td contenteditable="true"></td>
