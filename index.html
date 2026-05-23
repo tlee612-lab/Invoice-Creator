@@ -910,7 +910,7 @@
                 const allMileRates = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
                 const mileParts = allMileRates.map(rate => {
                     const mi = milesByRate.get(rate) || 0;
-                    const text = `Mileage @ $${rate.toFixed(2)}: ${mi.toFixed(1)}`;
+                    const text = `Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}: ${mi.toFixed(1)}`;
                     return rate < maxMileRate ? `<span class="blue-text">${text}</span>` : text;
                 });
                 const totalMilesAll = [...milesByRate.values()].reduce((s, m) => s + m, 0);
