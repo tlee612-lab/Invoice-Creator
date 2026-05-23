@@ -895,7 +895,7 @@
                     const allRates = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
                     const parts = allRates.map(rate => {
                         const mi = caseMilesByRate.get(rate) || 0;
-                        const text = `Mileage @ $${rate.toFixed(2)}: ${mi.toFixed(1)}`;
+                        const text = `Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}: ${mi.toFixed(1)}`;
                         return rate < maxRate ? `<span class="blue-text">${text}</span>` : text;
                     });
                     const caseTotal = [...caseMilesByRate.values()].reduce((s, m) => s + m, 0);
@@ -910,7 +910,7 @@
                 const allMileRates = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
                 const mileParts = allMileRates.map(rate => {
                     const mi = milesByRate.get(rate) || 0;
-                    const text = `Mileage @ $${rate.toFixed(2)}: ${mi.toFixed(1)}`;
+                    const text = `Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}: ${mi.toFixed(1)}`;
                     return rate < maxMileRate ? `<span class="blue-text">${text}</span>` : text;
                 });
                 const totalMilesAll = [...milesByRate.values()].reduce((s, m) => s + m, 0);
@@ -1014,7 +1014,7 @@
                     <td contenteditable="true"></td>
                     <td contenteditable="true">Investigator Service - Hours @ $${rate}</td>
                     <td style="text-align:center" contenteditable="true">${hrs.toFixed(1)} hrs</td>
-                    <td style="text-align:center" contenteditable="true">$${rate.toFixed(2)}</td>
+                    <td style="text-align:center" contenteditable="true">$${rate.toFixed(3).replace(/\.?0+$/, '')}</td>
                     <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
                 </tr>`);
             });
@@ -1350,8 +1350,8 @@
             hourly.forEach((e, i) => {
                 const prev = hourly[i - 1];
                 lines.push(prev
-                    ? `- Service hours before ${prev.effective}: $${e.rate.toFixed(2)}/hr`
-                    : `- Service hours on/after ${e.effective}: $${e.rate.toFixed(2)}/hr`);
+                    ? `- Service hours before ${prev.effective}: $${e.rate.toFixed(3).replace(/\.?0+$/, '')}/hr`
+                    : `- Service hours on/after ${e.effective}: $${e.rate.toFixed(3).replace(/\.?0+$/, '')}/hr`);
             });
 
             const mileage = sorted(s.mileage || []);
@@ -1362,8 +1362,8 @@
                     : `- Mileage on/after ${e.effective}: $${e.rate.toFixed(4)}/mi`);
             });
 
-            (s.copies_bw    || []).slice(-1).forEach(e => lines.push(`- B&W copies: $${e.rate.toFixed(2)} each`));
-            (s.copies_color || []).slice(-1).forEach(e => lines.push(`- Color copies: $${e.rate.toFixed(2)} each`));
+            (s.copies_bw    || []).slice(-1).forEach(e => lines.push(`- B&W copies: $${e.rate.toFixed(3).replace(/\.?0+$/, '')} each`));
+            (s.copies_color || []).slice(-1).forEach(e => lines.push(`- Color copies: $${e.rate.toFixed(3).replace(/\.?0+$/, '')} each`));
             return lines.join('\n');
         }
 
