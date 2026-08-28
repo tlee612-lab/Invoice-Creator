@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <title>Invoice Creator</title>
     <style>
         :root {
@@ -603,7 +604,7 @@
             'Logged At', 'Case Number', 'Client Last Name', 'Client First Name',
             'Activity Type', 'Date', 'Time', 'Duration (mins)', 'Tenths of Hours',
             'Running Total', 'Quantity', 'Mileage', 'From', 'To', 'Investigator',
-            'Notes', 'Billed'
+            'Notes', 'Billed', 'Expense Amount'
         ];
 
         function getTLIHeaders() {
@@ -634,6 +635,7 @@
                 to:           idx('To'),
                 investigator: idx('Investigator'),
                 notes:        idx('Notes'),
+                expenseAmount: idx('Expense Amount'),
             };
         }
 
@@ -3010,14 +3012,54 @@ ${payload}`;
             Object.entries(lightVars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
 
             try {
-                const pdfBlob = await html2pdf().set({
-                    margin:      0.4,
-                    filename:    filename,
-                    image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#f4f6fa' },
-                    jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
-                    pagebreak:   { mode: ['css', 'legacy'], avoid: ['tr', '.subtotal', '.case-header', '.invoice-totals-table', '.totals-section'] }
-                }).from(clone).output('blob');
+                // Render the clone once, then slice into pages manually at row
+                // boundaries. (html2pdf's own paginator re-clones into a narrower
+                // container, which squished the layout and cut/duplicated rows at
+                // page breaks on multi-page invoices.)
+                const MARGIN_IN = 0.4;
+                const CLONE_W = 816;                                  // CSS px width of the clone
+                const pageWIn = 8.5 - MARGIN_IN * 2;                  // printable width, inches
+                const pageHIn = 11  - MARGIN_IN * 2;                  // printable height, inches
+                const pxPerIn = CLONE_W / pageWIn;
+                const pageHPx = pageHIn * pxPerIn;                    // printable height in clone CSS px
+
+                // Allowed break positions: the top of every row / section heading /
+                // totals block, relative to the clone. A break at a row's top pushes
+                // that whole row to the next page.
+                const cloneRect = clone.getBoundingClientRect();
+                const totalH = Math.ceil(cloneRect.height);
+                const breakEls = clone.querySelectorAll('tr, .section-heading, h2, table, .invoice-totals-table, .totals-section');
+                const boundaries = [...new Set([...breakEls]
+                    .map(el => Math.floor(el.getBoundingClientRect().top - cloneRect.top))
+                    .filter(b => b > 0))].sort((a, b) => a - b);
+
+                const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#f4f6fa', windowWidth: CLONE_W });
+                const cScale = canvas.width / CLONE_W;
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ unit: 'in', format: 'letter', orientation: 'portrait' });
+                let y = 0, firstPage = true;
+                while (y < totalH - 1) {
+                    let end = Math.min(y + pageHPx, totalH);
+                    if (end < totalH) {
+                        // Snap the cut to the last safe boundary on this page
+                        const fit = boundaries.filter(b => b > y + 40 && b <= end);
+                        if (fit.length) end = fit[fit.length - 1];
+                    }
+                    const sliceH = end - y;
+                    const pageCanvas = document.createElement('canvas');
+                    pageCanvas.width = canvas.width;
+                    pageCanvas.height = Math.round(sliceH * cScale);
+                    const pctx = pageCanvas.getContext('2d');
+                    pctx.fillStyle = '#f4f6fa';
+                    pctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+                    pctx.drawImage(canvas, 0, Math.round(y * cScale), canvas.width, pageCanvas.height, 0, 0, canvas.width, pageCanvas.height);
+                    if (!firstPage) pdf.addPage();
+                    firstPage = false;
+                    pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', MARGIN_IN, MARGIN_IN, pageWIn, sliceH / pxPerIn);
+                    y = end;
+                }
+                const pdfBlob = pdf.output('blob');
 
                 // ── PDF Preview modal ─────────────────────────────────────────
                 ind.textContent = '👁 Preview ready';
@@ -3319,6 +3361,8 @@ ${payload}`;
                         if (isCopies) {
                             const rate = (catLower.includes('color')) ? getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, date) : getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw, date);
                             amount = qty * rate;
+                        } else if (colMap.expenseAmount >= 0) {
+                            amount = parseFloat((cols[colMap.expenseAmount] || '').replace(/[^\d.-]/g, '')) || 0;
                         }
                         const expenseDesc = isCopies ? 'Printed for Case File' : description;
 
