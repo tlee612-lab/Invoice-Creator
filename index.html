@@ -3031,15 +3031,42 @@ ${payload}`;
                 const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#f4f6fa', windowWidth: CLONE_W });
                 const cScale = canvas.width / CLONE_W;
 
+                // html2canvas re-renders in its own cloned window, so its layout can
+                // come out slightly taller/shorter than the DOM measurements above.
+                // Treat the CANVAS as ground truth: page over its full height, map
+                // DOM row boundaries by the drift ratio, and fine-tune every cut to
+                // a blank pixel row so a table row is never split across pages.
+                const canvasHCss = canvas.height / cScale;
+                const drift = totalH > 0 ? canvasHCss / totalH : 1;
+                const srcCtx = canvas.getContext('2d', { willReadFrequently: true });
+                const isBlankCssRow = (cssY) => {
+                    const py = Math.max(0, Math.min(canvas.height - 1, Math.round(cssY * cScale)));
+                    const d = srcCtx.getImageData(0, py, canvas.width, 1).data;
+                    let ink = 0;
+                    for (let i = 0; i < d.length; i += 32) {          // sample every 8th pixel
+                        if (d[i] < 160 && d[i + 1] < 160 && ++ink > 1) return false;
+                    }
+                    return true;
+                };
+                const snapToBlank = (cssY, minY) => {
+                    for (let dy = 0; dy < 80; dy++) {
+                        const yy = cssY - dy;
+                        if (yy <= minY + 40) break;
+                        if (isBlankCssRow(yy)) return yy;
+                    }
+                    return cssY;
+                };
+
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({ unit: 'in', format: 'letter', orientation: 'portrait' });
                 let y = 0, firstPage = true;
-                while (y < totalH - 1) {
-                    let end = Math.min(y + pageHPx, totalH);
-                    if (end < totalH) {
-                        // Snap the cut to the last safe boundary on this page
-                        const fit = boundaries.filter(b => b > y + 40 && b <= end);
-                        if (fit.length) end = fit[fit.length - 1];
+                while (y < canvasHCss - 1) {
+                    let end = Math.min(y + pageHPx, canvasHCss);
+                    if (end < canvasHCss - 1) {
+                        // Prefer the last DOM row boundary on this page (drift-corrected),
+                        // then settle the cut onto a blank pixel row
+                        const fit = boundaries.map(b => b * drift).filter(b => b > y + 40 && b <= end);
+                        end = snapToBlank(fit.length ? fit[fit.length - 1] : end, y);
                     }
                     const sliceH = end - y;
                     const pageCanvas = document.createElement('canvas');
