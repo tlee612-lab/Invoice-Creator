@@ -925,7 +925,7 @@
             // Process Expenses
             const expenseTable = document.getElementById('table-expenses');
             const expenseCaseHeaders = expenseTable.querySelectorAll('.case-header');
-            let totalBW = 0, totalColor = 0;
+            let totalBW = 0, totalColor = 0, totalOtherExp = 0;
             expenseCaseHeaders.forEach(caseHeader => {
                 const caseNumber = caseHeader.dataset.caseId;
                 let caseExpenses = 0;
@@ -964,6 +964,7 @@
                     if (amountCell) {
                         const amount = parseFloat(amountCell.textContent.replace(/[^\d.-]/g, '')) || 0;
                         caseExpenses += amount;
+                        if (!(category.includes('photocopy') || category.includes('copies'))) totalOtherExp += amount;
                     }
                     currentRow = currentRow.nextElementSibling;
                 }
@@ -1002,6 +1003,9 @@
             const colRate = getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, new Date().toISOString().slice(0,10));
             const copyInfo0 = totalBW    > 0 ? `B&W Copies: ${totalBW} ($${(totalBW * bwRate).toFixed(2)})` : '';
             const copyInfo1 = totalColor > 0 ? `Color Copies: ${totalColor} ($${(totalColor * colRate).toFixed(2)})` : '';
+            const otherInfo = totalOtherExp > 0 ? `Other OOP: $${totalOtherExp.toFixed(2)}` : '';
+            // Left-column breakdown notes, doled out one per totals row top-down
+            const leftNotes = [copyInfo0, copyInfo1, otherInfo].filter(Boolean);
 
             const rows = [];
             // Hours rows — always show every rate tier (even 0.0) for verification
@@ -1010,7 +1014,7 @@
                 const hrs = hoursByRate.get(rate) || 0;
                 const amt = hrs * rate;
                 grandTotal += amt;
-                const copyCol = i === 0 ? copyInfo0 : (i === 1 ? copyInfo1 : '');
+                const copyCol = leftNotes.shift() || '';
                 rows.push(`<tr>
                     <td contenteditable="true">${copyCol}</td>
                     <td contenteditable="true"></td>
@@ -1023,21 +1027,12 @@
             // If config has no rate tiers at all, show a blank placeholder row
             if (allHourRates.length === 0) {
                 rows.push(`<tr>
-                    <td contenteditable="true">${copyInfo0}</td>
+                    <td contenteditable="true">${leftNotes.shift() || ''}</td>
                     <td contenteditable="true"></td>
                     <td contenteditable="true">Investigator Service - Hours</td>
                     <td style="text-align:center" contenteditable="true">0.0 hrs</td>
                     <td style="text-align:center" contenteditable="true">—</td>
                     <td class="amount-col" contenteditable="true">$0.00</td>
-                </tr>`);
-            }
-            // If copy info didn't fit on a hours row, add a spillover row
-            if (allHourRates.length < 2 && copyInfo1) {
-                rows.push(`<tr>
-                    <td contenteditable="true">${copyInfo1}</td>
-                    <td contenteditable="true"></td><td contenteditable="true"></td>
-                    <td contenteditable="true"></td><td contenteditable="true"></td>
-                    <td class="amount-col" contenteditable="true"></td>
                 </tr>`);
             }
 
@@ -1057,7 +1052,7 @@
                     const amt = Math.round(mi * rate * 100) / 100;
                     grandTotal += amt;
                     rows.push(`<tr>
-                        <td contenteditable="true"></td>
+                        <td contenteditable="true">${leftNotes.shift() || ''}</td>
                         <td contenteditable="true"></td>
                         <td contenteditable="true">Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}/mi</td>
                         <td style="text-align:center" contenteditable="true">${mi.toFixed(1)} mi</td>
@@ -1070,7 +1065,7 @@
             // Expenses row
             grandTotal += totalExpenses;
             rows.push(`<tr>
-                <td contenteditable="true"></td><td contenteditable="true"></td>
+                <td contenteditable="true">${leftNotes.shift() || ''}</td><td contenteditable="true"></td>
                 <td contenteditable="true">Out of Pocket Expenses</td>
                 <td style="text-align:center" contenteditable="true">—</td>
                 <td style="text-align:center" contenteditable="true">—</td>
