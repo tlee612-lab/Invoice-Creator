@@ -597,6 +597,28 @@
             return schedule.reduce((max, e) => e.rate > max ? e.rate : max, 0);
         }
 
+        // The service rate is fixed on the PAE itself (Auth Serv Amt / Auth Hours).
+        // When those fields yield a clean per-hour figure, it replaces the newest
+        // tier of the dated table; historical tiers still bucket by date. Mileage
+        // is the opposite — the PAE travel figure is only an estimate, and actual
+        // miles always pay at the guideline rate for the period they were driven.
+        function getPaeApprovedRate() {
+            const amtEl = document.getElementById('field-auth-serv');
+            const hrsEl = document.getElementById('field-auth-hours');
+            if (!amtEl || !hrsEl) return null;
+            const amt = parseFloat((amtEl.textContent || '').replace(/[^\d.]/g, ''));
+            const hrs = parseFloat((hrsEl.textContent || '').replace(/[^\d.]/g, ''));
+            if (!amt || !hrs) return null;
+            const rate = Math.round((amt / hrs) * 100) / 100;
+            return (rate >= 20 && rate <= 300 && Math.abs(amt / hrs - rate) < 0.005) ? rate : null;
+        }
+        function getHourlyRateForDate(dateStr) {
+            const table = CONFIG.RATE_SCHEDULES.hourly;
+            const rate = getRateForDate(table, dateStr);
+            const pae = getPaeApprovedRate();
+            return (pae !== null && rate === getCurrentRate(table)) ? pae : rate;
+        }
+
         // ── TLI Column Layout ─────────────────────────────────────────────────────
         // The canonical column names for a TLI Field Log export.
         // Saved to localStorage as 'tliHeaders'; falls back to this default.
@@ -680,8 +702,21 @@
 
         const CONFIG = {
             RATE_SCHEDULES: {
-                hourly:       [{ effective: '2025-08-01', rate: 59.00 }, { effective: '2000-01-01', rate: 55.00 }],
-                mileage:      [{ effective: '2026-01-01', rate: 0.725 }, { effective: '2025-01-01', rate: 0.70 }],
+                // OPDC guideline rates. Every rate is bucketed per ROW by that
+                // row's own service date — never per invoice. New entries go on
+                // top when OPDC publishes a change (mileage moves each Jan/Jul).
+                hourly: [
+                    { effective: '2025-08-01', rate: 59.00 },   // Monolingual (as of 8/1/25)
+                    { effective: '2023-10-01', rate: 55.00 },   // Monolingual (as of 10/1/23)
+                    { effective: '2000-01-01', rate: 40.00 },   // Monolingual
+                ],
+                mileage: [
+                    { effective: '2026-07-01', rate: 0.76 },
+                    { effective: '2026-01-01', rate: 0.725 },
+                    { effective: '2025-01-01', rate: 0.70 },
+                    { effective: '2024-01-01', rate: 0.67 },
+                    { effective: '2000-01-01', rate: 0.655 },
+                ],
                 copies_bw:    [{ effective: '2000-01-01', rate: 0.10 }],
                 copies_color: [{ effective: '2000-01-01', rate: 0.50 }],
             },
@@ -800,7 +835,7 @@
                         const date = parseLocalDate(dateCell);
                         if (!isNaN(date.getTime())) {
                             allServiceDates.push(date);
-                            const rate = getRateForDate(CONFIG.RATE_SCHEDULES.hourly, dateCell);
+                            const rate = getHourlyRateForDate(dateCell);
                             caseHoursByRate.set(rate, (caseHoursByRate.get(rate) || 0) + hours);
                         }
                     }
@@ -826,13 +861,11 @@
                     subtotalRow.cells[1].textContent = caseTotal.toFixed(1);
                 }
             });
-            // Update merged hours subtotal footer — always show every rate tier
+            // Update merged hours subtotal footer — one part per bucket with hours in it
             const hoursMerged = document.getElementById('hours-merged-subtotal');
             if (hoursMerged) {
                 const maxHourRate = getCurrentRate(CONFIG.RATE_SCHEDULES.hourly);
-                const allHourRatesList = [...new Set(CONFIG.RATE_SCHEDULES.hourly.map(e => e.rate))].sort((a, b) => a - b);
-                const hourParts = allHourRatesList.map(rate => {
-                    const hrs = hoursByRate.get(rate) || 0;
+                const hourParts = [...hoursByRate.entries()].sort((a, b) => a[0] - b[0]).map(([rate, hrs]) => {
                     const text = `Hours @ $${rate}: ${hrs.toFixed(1)}`;
                     return rate < maxHourRate ? `<span class="blue-text">${text}</span>` : text;
                 });
@@ -849,8 +882,6 @@
                 if (runCell) runCell.textContent = runningTotal.toFixed(1);
             });
 
-            const totalHours55 = hoursByRate.get(55) || 0; // legacy compat for auth-hours check
-            const totalHours59 = hoursByRate.get(59) || 0;
 
             // Update Date Range automatically from ALL service entries (even zero-hour entries)
             if (allServiceDates.length > 0) {
@@ -893,11 +924,9 @@
                                     mileageTable.querySelector(`.subtotal[data-case-id="${caseNumber}"]`);
                 if (subtotalRow && subtotalRow.cells.length >= 2) {
                     const maxRate = getCurrentRate(CONFIG.RATE_SCHEDULES.mileage);
-                    // Always show every rate tier (even 0.0) so the split is visible for verification
-                    const allRates = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
-                    const parts = allRates.map(rate => {
-                        const mi = caseMilesByRate.get(rate) || 0;
-                        const text = `Mileage @ $${rate.toFixed(2)}: ${mi.toFixed(1)}`;
+                    // One part per rate bucket that has miles in it
+                    const parts = [...caseMilesByRate.entries()].sort((a, b) => a[0] - b[0]).map(([rate, mi]) => {
+                        const text = `Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}: ${mi.toFixed(1)}`;
                         return rate < maxRate ? `<span class="blue-text">${text}</span>` : text;
                     });
                     const caseTotal = [...caseMilesByRate.values()].reduce((s, m) => s + m, 0);
@@ -909,9 +938,7 @@
             const mileageMerged = document.getElementById('mileage-merged-subtotal');
             if (mileageMerged) {
                 const maxMileRate = getCurrentRate(CONFIG.RATE_SCHEDULES.mileage);
-                const allMileRates = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
-                const mileParts = allMileRates.map(rate => {
-                    const mi = milesByRate.get(rate) || 0;
+                const mileParts = [...milesByRate.entries()].sort((a, b) => a[0] - b[0]).map(([rate, mi]) => {
                     const text = `Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}: ${mi.toFixed(1)}`;
                     return rate < maxMileRate ? `<span class="blue-text">${text}</span>` : text;
                 });
@@ -919,8 +946,6 @@
                 mileageMerged.cells[0].innerHTML = (mileParts.length ? mileParts.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : '') + 'Subtotal:';
                 mileageMerged.cells[1].textContent = totalMilesAll.toFixed(1);
             }
-            const totalMiles2025 = milesByRate.get(0.70) || 0; // legacy compat
-            const totalMiles2026 = milesByRate.get(0.725) || 0;
 
             // Process Expenses
             const expenseTable = document.getElementById('table-expenses');
@@ -1008,24 +1033,24 @@
             const leftNotes = [copyInfo0, copyInfo1, otherInfo].filter(Boolean);
 
             const rows = [];
-            // Hours rows — always show every rate tier (even 0.0) for verification
-            const allHourRates = [...new Set(CONFIG.RATE_SCHEDULES.hourly.map(e => e.rate))].sort((a, b) => a - b);
-            allHourRates.forEach((rate, i) => {
-                const hrs = hoursByRate.get(rate) || 0;
-                const amt = hrs * rate;
-                grandTotal += amt;
-                const copyCol = leftNotes.shift() || '';
+            const fmtMileRate = r => r.toFixed(3).replace(/\.?0+$/, '');
+            // Hours rows — one line per rate bucket that has hours in it.
+            // Rounding happens once per bucket; the grand total sums the
+            // rounded bucket amounts so the printed lines add to the total.
+            const hourBuckets = [...hoursByRate.entries()].sort((a, b) => a[0] - b[0])
+                .map(([rate, hrs]) => ({ rate, qty: hrs, amt: Math.round(hrs * rate * 100) / 100 }));
+            hourBuckets.forEach(b => {
+                grandTotal += b.amt;
                 rows.push(`<tr>
-                    <td contenteditable="true">${copyCol}</td>
+                    <td contenteditable="true">${leftNotes.shift() || ''}</td>
                     <td contenteditable="true"></td>
-                    <td contenteditable="true">Investigator Service - Hours @ $${rate}</td>
-                    <td style="text-align:center" contenteditable="true">${hrs.toFixed(1)} hrs</td>
-                    <td style="text-align:center" contenteditable="true">$${rate.toFixed(2)}</td>
-                    <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
+                    <td contenteditable="true">Investigator Service - Hours @ $${b.rate}</td>
+                    <td style="text-align:center" contenteditable="true">${b.qty.toFixed(1)} hrs</td>
+                    <td style="text-align:center" contenteditable="true">$${b.rate.toFixed(2)}</td>
+                    <td class="amount-col" contenteditable="true">$${b.amt.toFixed(2)}</td>
                 </tr>`);
             });
-            // If config has no rate tiers at all, show a blank placeholder row
-            if (allHourRates.length === 0) {
+            if (hourBuckets.length === 0) {
                 rows.push(`<tr>
                     <td contenteditable="true">${leftNotes.shift() || ''}</td>
                     <td contenteditable="true"></td>
@@ -1036,30 +1061,28 @@
                 </tr>`);
             }
 
-            // Mileage rows — always show every configured rate tier (even 0.0) for verification
-            const allMileRatesSorted = [...new Set(CONFIG.RATE_SCHEDULES.mileage.map(e => e.rate))].sort((a, b) => a - b);
-            if (allMileRatesSorted.length === 0) {
+            // Mileage rows — one line per rate bucket that has miles in it
+            const mileBuckets = [...milesByRate.entries()].sort((a, b) => a[0] - b[0])
+                .map(([rate, mi]) => ({ rate, qty: mi, amt: Math.round(mi * rate * 100) / 100 }));
+            mileBuckets.forEach(b => {
+                grandTotal += b.amt;
                 rows.push(`<tr>
-                    <td contenteditable="true"></td><td contenteditable="true"></td>
+                    <td contenteditable="true">${leftNotes.shift() || ''}</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true">Mileage @ $${fmtMileRate(b.rate)}/mi</td>
+                    <td style="text-align:center" contenteditable="true">${b.qty.toFixed(1)} mi</td>
+                    <td style="text-align:center" contenteditable="true">$${fmtMileRate(b.rate)}</td>
+                    <td class="amount-col" contenteditable="true">$${b.amt.toFixed(2)}</td>
+                </tr>`);
+            });
+            if (mileBuckets.length === 0) {
+                rows.push(`<tr>
+                    <td contenteditable="true">${leftNotes.shift() || ''}</td><td contenteditable="true"></td>
                     <td contenteditable="true">Mileage</td>
                     <td style="text-align:center" contenteditable="true">0.0 mi</td>
                     <td style="text-align:center" contenteditable="true">—</td>
                     <td class="amount-col" contenteditable="true">$0.00</td>
                 </tr>`);
-            } else {
-                allMileRatesSorted.forEach(rate => {
-                    const mi = milesByRate.get(rate) || 0;
-                    const amt = Math.round(mi * rate * 100) / 100;
-                    grandTotal += amt;
-                    rows.push(`<tr>
-                        <td contenteditable="true">${leftNotes.shift() || ''}</td>
-                        <td contenteditable="true"></td>
-                        <td contenteditable="true">Mileage @ $${rate.toFixed(3).replace(/\.?0+$/, '')}/mi</td>
-                        <td style="text-align:center" contenteditable="true">${mi.toFixed(1)} mi</td>
-                        <td style="text-align:center" contenteditable="true">$${rate.toFixed(3).replace(/\.?0+$/, '')}</td>
-                        <td class="amount-col" contenteditable="true">$${amt.toFixed(2)}</td>
-                    </tr>`);
-                });
             }
 
             // Expenses row
@@ -1080,6 +1103,45 @@
             </tr>`);
 
             totalsTable.innerHTML = rows.join('');
+
+            // ── OPDC submission note ─────────────────────────────────────────
+            // The Nintex form allows one rate per typed row; the NEWEST rate
+            // always occupies the real row and older-rate work collapses to a
+            // dollar figure in the section's catch-all field. When an invoice
+            // spans more than one rate period, spell that split out so the
+            // submitter never derives it from the totals. Screen-only — the
+            // print/PDF invoice is the attachment and carries the breakdown.
+            const noteLines = [];
+            if (hourBuckets.length > 1) {
+                const cur = hourBuckets[hourBuckets.length - 1];
+                const olderAmt = hourBuckets.slice(0, -1).reduce((s, b) => s + b.amt, 0);
+                const olderDetail = hourBuckets.slice(0, -1).map(b => `${b.qty.toFixed(1)} hrs @ $${b.rate}`).join(' + ');
+                noteLines.push(`Service hours span ${hourBuckets.length} rate periods. On the OPDC form, enter ` +
+                    `<strong>${cur.qty.toFixed(1)} hrs @ $${cur.rate}</strong> in the Investigation row and ` +
+                    `<strong>$${olderAmt.toFixed(2)}</strong> (${olderDetail}) in Other Miscellaneous Services OR Multiple Rates.`);
+            }
+            if (mileBuckets.length > 1) {
+                const cur = mileBuckets[mileBuckets.length - 1];
+                const olderAmt = mileBuckets.slice(0, -1).reduce((s, b) => s + b.amt, 0);
+                const olderDetail = mileBuckets.slice(0, -1).map(b => `${b.qty.toFixed(1)} mi @ $${fmtMileRate(b.rate)}`).join(' + ');
+                noteLines.push(`Mileage spans ${mileBuckets.length} rate periods. On the OPDC form, enter ` +
+                    `<strong>${cur.qty.toFixed(1)} mi @ $${fmtMileRate(cur.rate)}</strong> in the Mileage row and ` +
+                    `<strong>$${olderAmt.toFixed(2)}</strong> (${olderDetail}) in Travel Expenses (Prior Year Mileage).`);
+            }
+            let noteBox = document.getElementById('submission-note');
+            if (noteLines.length) {
+                if (!noteBox) {
+                    noteBox = document.createElement('div');
+                    noteBox.id = 'submission-note';
+                    noteBox.className = 'print-hide';
+                    noteBox.style.cssText = 'margin:12px 0;padding:10px 14px;border:1px solid var(--accent);border-radius:6px;background:var(--surface2);font-size:12px;line-height:1.5;';
+                    const totalsTableEl = totalsTable.closest('table');
+                    totalsTableEl.parentNode.insertBefore(noteBox, totalsTableEl.nextSibling);
+                }
+                noteBox.innerHTML = '<strong>⚠ OPDC form entry:</strong><br>' + noteLines.join('<br>');
+            } else if (noteBox) {
+                noteBox.remove();
+            }
 
             // Overage/remaining status in left cells of grand total row (always visible when auth hours set)
             const authHoursEl = document.getElementById('field-auth-hours');
@@ -1577,7 +1639,7 @@
                     const hrsCell  = tr.cells[5]?.textContent.trim();
                     const hrs = parseFloat(hrsCell) || 0;
                     if (!dateCell || hrs <= 0) return;
-                    const rate = getRateForDate(CONFIG.RATE_SCHEDULES.hourly, dateCell);
+                    const rate = getHourlyRateForDate(dateCell);
                     hoursByRate.set(rate, (hoursByRate.get(rate) || 0) + hrs);
                 });
 
