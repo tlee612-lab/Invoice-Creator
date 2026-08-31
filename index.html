@@ -575,6 +575,15 @@
             return new Date(dateStr);
         }
 
+        // Multiply quantity × rate entirely in scaled integers so binary float
+        // error can never drop a cent: 13 × 0.725 is 9.424999999999999 in JS,
+        // which toFixed/Math.round(x*100) round DOWN to $9.42 — QuickBooks says
+        // $9.43 and QuickBooks is right. Quantities are tenths (hours, miles)
+        // or whole units (copies); rates have at most 3 decimals.
+        function moneyMul(qty, rate) {
+            return Math.round(Math.round(qty * 10) * Math.round(rate * 1000) / 100) / 100;
+        }
+
         // Look up rate for a given date from a schedule array [{effective:'YYYY-MM-DD', rate}]
         // Returns rate of most recent entry whose effective date <= dateStr; falls back to last entry
         function getRateForDate(schedule, dateStr) {
@@ -972,7 +981,7 @@
                         const rate = category.includes('color') ? getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, dateCell) : getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw, dateCell);
                         const rowAmtCell = currentRow.cells[5];
                         if (rowAmtCell && (rowAmtCell.textContent.trim() === '$0.00' || rowAmtCell.textContent.trim() === '' || rowAmtCell.dataset.auto === 'true')) {
-                            rowAmtCell.textContent = '$' + (qty * rate).toFixed(2);
+                            rowAmtCell.textContent = '$' + moneyMul(qty, rate).toFixed(2);
                             rowAmtCell.dataset.auto = 'true';
                         }
 
@@ -1026,8 +1035,8 @@
             let grandTotal = 0;
             const bwRate  = getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw,    new Date().toISOString().slice(0,10));
             const colRate = getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, new Date().toISOString().slice(0,10));
-            const copyInfo0 = totalBW    > 0 ? `B&W Copies: ${totalBW} ($${(totalBW * bwRate).toFixed(2)})` : '';
-            const copyInfo1 = totalColor > 0 ? `Color Copies: ${totalColor} ($${(totalColor * colRate).toFixed(2)})` : '';
+            const copyInfo0 = totalBW    > 0 ? `B&W Copies: ${totalBW} ($${moneyMul(totalBW, bwRate).toFixed(2)})` : '';
+            const copyInfo1 = totalColor > 0 ? `Color Copies: ${totalColor} ($${moneyMul(totalColor, colRate).toFixed(2)})` : '';
             const otherInfo = totalOtherExp > 0 ? `Other OOP: $${totalOtherExp.toFixed(2)}` : '';
             // Left-column breakdown notes, doled out one per totals row top-down
             const leftNotes = [copyInfo0, copyInfo1, otherInfo].filter(Boolean);
@@ -1038,7 +1047,7 @@
             // Rounding happens once per bucket; the grand total sums the
             // rounded bucket amounts so the printed lines add to the total.
             const hourBuckets = [...hoursByRate.entries()].sort((a, b) => a[0] - b[0])
-                .map(([rate, hrs]) => ({ rate, qty: hrs, amt: Math.round(hrs * rate * 100) / 100 }));
+                .map(([rate, hrs]) => ({ rate, qty: hrs, amt: moneyMul(hrs, rate) }));
             hourBuckets.forEach(b => {
                 grandTotal += b.amt;
                 rows.push(`<tr>
@@ -1063,7 +1072,7 @@
 
             // Mileage rows — one line per rate bucket that has miles in it
             const mileBuckets = [...milesByRate.entries()].sort((a, b) => a[0] - b[0])
-                .map(([rate, mi]) => ({ rate, qty: mi, amt: Math.round(mi * rate * 100) / 100 }));
+                .map(([rate, mi]) => ({ rate, qty: mi, amt: moneyMul(mi, rate) }));
             mileBuckets.forEach(b => {
                 grandTotal += b.amt;
                 rows.push(`<tr>
@@ -1661,12 +1670,12 @@
 
                 let grandTotal = expenseTotal;
                 const hourLines = [...hoursByRate.entries()].sort((a,b) => a[0]-b[0]).map(([r,h]) => {
-                    const amt = parseFloat((h * r).toFixed(2));
+                    const amt = moneyMul(h, r);
                     grandTotal += amt;
                     return `  Hours @ $${r}/hr: ${h.toFixed(1)} hrs = $${amt.toFixed(2)}`;
                 });
                 const mileLines = [...milesByRate.entries()].sort((a,b) => a[0]-b[0]).map(([r,m]) => {
-                    const amt = parseFloat((m * r).toFixed(2));
+                    const amt = moneyMul(m, r);
                     grandTotal += amt;
                     return `  Mileage @ $${r.toFixed(2)}/mi: ${m.toFixed(1)} mi = $${amt.toFixed(2)}`;
                 });
@@ -3444,7 +3453,7 @@ ${payload}`;
                         const isCopies = catLower.includes('photocopy') || catLower.includes('copies');
                         if (isCopies) {
                             const rate = (catLower.includes('color')) ? getRateForDate(CONFIG.RATE_SCHEDULES.copies_color, date) : getRateForDate(CONFIG.RATE_SCHEDULES.copies_bw, date);
-                            amount = qty * rate;
+                            amount = moneyMul(qty, rate);
                         } else if (colMap.expenseAmount >= 0) {
                             amount = parseFloat((cols[colMap.expenseAmount] || '').replace(/[^\d.-]/g, '')) || 0;
                         }
