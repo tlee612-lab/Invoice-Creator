@@ -88,8 +88,21 @@
 
         .invoice-container { max-width: 950px; margin: 0 auto; background: var(--surface); padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); color: var(--text); }
         @media print {
+            /* Force the light palette for paper regardless of browser print
+               settings — the on-screen theme is dark, and print-color-adjust:
+               exact below would otherwise print the dark backgrounds. */
+            :root {
+                --bg: #ffffff;
+                --surface: #ffffff;
+                --surface2: #e8ecf4;
+                --border: #0066cc;
+                --accent: #0066cc;
+                --accent2: #0066cc;
+                --text: #111111;
+                --muted: #555555;
+            }
             #import-zone, #ai-results, .modal-overlay { display: none !important; }
-            body { margin: 0; padding: 0; }
+            body { margin: 0; padding: 0; background: #ffffff !important; color: #111111 !important; }
             .invoice-container {
                 max-width: 100% !important;
                 box-shadow: none !important;
@@ -3140,6 +3153,7 @@ ${payload}`;
 
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({ unit: 'in', format: 'letter', orientation: 'portrait' });
+                const previewPages = []; // page JPEGs, shown in the preview modal as plain <img>s
                 let y = 0, firstPage = true;
                 while (y < canvasHCss - 1) {
                     let end = Math.min(y + pageHPx, canvasHCss);
@@ -3159,14 +3173,15 @@ ${payload}`;
                     pctx.drawImage(canvas, 0, Math.round(y * cScale), canvas.width, pageCanvas.height, 0, 0, canvas.width, pageCanvas.height);
                     if (!firstPage) pdf.addPage();
                     firstPage = false;
-                    pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', MARGIN_IN, MARGIN_IN, pageWIn, sliceH / pxPerIn);
+                    const pageJpeg = pageCanvas.toDataURL('image/jpeg', 0.98);
+                    pdf.addImage(pageJpeg, 'JPEG', MARGIN_IN, MARGIN_IN, pageWIn, sliceH / pxPerIn);
+                    previewPages.push(pageJpeg);
                     y = end;
                 }
                 const pdfBlob = pdf.output('blob');
 
                 // ── PDF Preview modal ─────────────────────────────────────────
                 ind.textContent = '👁 Preview ready';
-                const blobUrl = URL.createObjectURL(pdfBlob);
 
                 const pvOverlay = document.createElement('div');
                 pvOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;box-sizing:border-box';
@@ -3179,15 +3194,24 @@ ${payload}`;
                     <button id="pvCloseBtn" style="padding:8px 14px;border-radius:6px;border:1px solid #888;background:rgba(255,255,255,0.1);color:#fff;font-family:var(--ui);font-weight:700;font-size:13px;cursor:pointer">✕ Close</button>
                 `;
 
-                const pvFrame = document.createElement('iframe');
-                pvFrame.src = blobUrl;
-                pvFrame.style.cssText = 'width:100%;max-width:900px;flex:1;border:none;border-radius:6px;background:#fff;min-height:0';
+                // Show the page images directly instead of a blob-PDF iframe.
+                // Chrome with "Download PDFs" enabled (e.g. after an Acrobat
+                // install) refuses to render PDFs inline and shows a download
+                // placeholder; plain <img> previews are immune to that setting.
+                const pvScroll = document.createElement('div');
+                pvScroll.style.cssText = 'width:100%;max-width:900px;flex:1;overflow:auto;border:none;border-radius:6px;background:#3a3f4a;padding:12px;box-sizing:border-box;min-height:0';
+                previewPages.forEach(src => {
+                    const im = document.createElement('img');
+                    im.src = src;
+                    im.style.cssText = 'display:block;width:100%;background:#fff;margin:0 auto 14px;box-shadow:0 2px 10px rgba(0,0,0,0.5);border-radius:2px';
+                    pvScroll.appendChild(im);
+                });
 
-                pvOverlay.append(pvToolbar, pvFrame);
+                pvOverlay.append(pvToolbar, pvScroll);
                 document.body.appendChild(pvOverlay);
 
                 await new Promise(resolve => {
-                    const cleanup = () => { URL.revokeObjectURL(blobUrl); pvOverlay.remove(); resolve(); };
+                    const cleanup = () => { pvOverlay.remove(); resolve(); };
 
                     pvOverlay.querySelector('#pvCloseBtn').onclick = () => {
                         ind.textContent = origText;
