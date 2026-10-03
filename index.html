@@ -796,6 +796,13 @@
                 .replace(/intelligence gathering\s*(&|and)\s*osint/gi, 'OSINT')
                 .replace(/investigative reporting\s*(&|and)\s*documentation/gi, 'Inv. Report / Doc')
                 .replace(/technical analysis\s*(&|and)\s*evidence processing/gi, 'Tech Analysis / Evid.')
+                .replace(/court appearance\s*(&|and)\s*testimony/gi, 'Court / Testimony')
+                .replace(/process service\s*\(third[- ]party\)/gi, 'Process Service (3rd)')
+                // Retired category names still sitting on old rows
+                .replace(/case analysis\s*(&|and)\s*reporting/gi, 'Analysis / Report')
+                .replace(/case intake\s*(&|and)\s*initial review/gi, 'Intake & Audit')
+                .replace(/discovery\s*(&|and)\s*evidence analysis/gi, 'Discovery/Review')
+                .replace(/investigative planning\s*(&|and)\s*consultation/gi, 'Planning / Consult')
                 .trim();
         }
 
