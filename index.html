@@ -913,15 +913,6 @@
             });
 
 
-            // Update Date Range automatically from ALL service entries (even zero-hour entries)
-            if (allServiceDates.length > 0) {
-                const minDate = new Date(Math.min(...allServiceDates));
-                const maxDate = new Date(Math.max(...allServiceDates));
-                const formatDate = (d) => `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()}`;
-                const rangeEl = document.getElementById('field-date-range');
-                if (rangeEl) rangeEl.textContent = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
-            }
-
             // Process Mileage
             const mileageTable = document.getElementById('table-mileage');
             const mileageCaseHeaders = mileageTable.querySelectorAll('.case-header');
@@ -1047,6 +1038,17 @@
                 const labelText = breakdown.length > 0 ? breakdown.join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : '';
                 expensesMerged.cells[0].innerHTML = `${labelText}Subtotal:`;
                 expensesMerged.cells[1].textContent = '$' + totalExpenses.toFixed(2);
+            }
+
+            // Update Date Range from ALL dated entries — service hours, mileage
+            // AND expenses — so a travel or expense date outside the hours span
+            // still widens the billing range. (Runs after all three sections.)
+            if (allServiceDates.length > 0) {
+                const minDate = new Date(Math.min(...allServiceDates));
+                const maxDate = new Date(Math.max(...allServiceDates));
+                const formatDate = (d) => `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()}`;
+                const rangeEl = document.getElementById('field-date-range');
+                if (rangeEl) rangeEl.textContent = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
             }
 
             // Update totals table — dynamically build rows from rate schedule data
